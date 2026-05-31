@@ -91,7 +91,11 @@
     <string name="community_title">Community</string>
     <string name="licenses_title">Licenses</string>
     <string name="qq_group_name">Official Community Group</string>
-    <string name="qq_group_number">655320112</string>
+    <string name="qq_group_number">818459127</string>
+    <string name="luaforge_qq_group_name">LuaForge Official Group</string>
+    <string name="luaforge_qq_group_number">Tap to join</string>
+    <string name="telegram_group_name">Official Telegram</string>
+    <string name="telegram_group_desc">@crackhannel</string>
     <string name="no_license_info">No license info</string>
     <string name="loading_doc">Loading document…</string>
     <string name="error_doc_not_found">Document file not found: %s</string>
@@ -116,6 +120,8 @@
     <string name="dev_android_role">Platform</string>
     <string name="dev_compose_name">Jetpack Compose</string>
     <string name="dev_compose_role">UI Framework</string>
+    <string name="dev_nirithy_name">Nirithy</string>
+    <string name="dev_nirithy_role">Developer</string>
 
     <!-- Copyright and version -->
     <string name="copyright">© %s LuaForge Studio</string>

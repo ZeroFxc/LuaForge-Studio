@@ -235,6 +235,14 @@ fun AboutScreen(onBack: () -> Unit) {
                 color = Color(0xFFD97757),
                 iconResId = R.drawable.ic_compose,
                 url = "https://developer.android.com/jetpack/compose"
+            ),
+            Developer(
+                nameResId = R.string.dev_nirithy_name,
+                roleResId = R.string.dev_nirithy_role,
+                description = "",
+                color = Color(0xFF5B8DEF),
+                iconResId = R.drawable.ic_studio,
+                url = "https://星辰.online"
             )
         )
     }
@@ -289,7 +297,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         LogCatcher.i("AboutScreen", "打开QQ群")
                         val intent = Intent(
                             Intent.ACTION_VIEW,
-                            "https://qun.qq.com/universal-share/share?ac=1&authKey=fHBSdBajwT9XrPXNUDcaHH17V%2F9xWMrW1qoPGaRgnznVc5MnD%2BW9%2BJr9dtl5J&busi_data=eyJncm91cENvZGUiOiI2NTUzMjAxMTIiLCJ0b2tlbiI6ImdpYmcxUG16a2JvZHROVzJzVkVKdTBrekxEankxNlYza0NwaXNUNW9xNHk1bVBCNXdrMG40ZnVzK0Y2Z0VwbnEiLCJ1aW4iOiIxNDQ3MDE3NzAxIn0%3D&data=9sSl5HKUN9A82WDrHO0ixxwNEEKTiRmbpG-5AhdhGft7lEaUrorDneokip8GNMS47lVst25Mi8NE4MAod9SdPA&svctype=4&tempid=h5_group_info".toUri()
+                            "https://qm.qq.com/q/Vl569JHQo8".toUri()
                         )
                         context.startActivity(intent)
                     } catch (e: Exception) {
@@ -335,6 +343,142 @@ fun AboutScreen(onBack: () -> Unit) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = stringResource(R.string.qq_group_number),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Surface(
+                onClick = {
+                    try {
+                        LogCatcher.i("AboutScreen", "打开LuaForge官方群")
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            "https://qm.qq.com/q/ysgZEMR2Yo".toUri()
+                        )
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        LogCatcher.e("AboutScreen", "打开LuaForge官方群失败", e)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = MaterialTheme.shapes.large
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF1290DB),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_qq),
+                                contentDescription = "QQ Group",
+                                modifier = Modifier.size(24.dp),
+                                tint = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.luaforge_qq_group_name),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.luaforge_qq_group_number),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Surface(
+                onClick = {
+                    try {
+                        LogCatcher.i("AboutScreen", "打开Telegram")
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            "https://t.me/crackhannel".toUri()
+                        )
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        LogCatcher.e("AboutScreen", "打开Telegram失败", e)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = MaterialTheme.shapes.large
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF26A5E4),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "T",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.telegram_group_name),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.telegram_group_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
