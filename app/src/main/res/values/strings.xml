@@ -96,6 +96,8 @@
     <string name="luaforge_qq_group_number">点击加入</string>
     <string name="telegram_group_name">官方 Telegram</string>
     <string name="telegram_group_desc">@crackhannel</string>
+    <string name="official_website_name">官方网站</string>
+    <string name="official_website_desc">星辰.online</string>
     <string name="no_license_info">暂无协议信息</string>
     <string name="loading_doc">加载文档中…</string>
     <string name="error_doc_not_found">文档文件不存在: %s</string>

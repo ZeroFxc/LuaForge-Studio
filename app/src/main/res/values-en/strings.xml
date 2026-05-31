@@ -96,6 +96,8 @@
     <string name="luaforge_qq_group_number">Tap to join</string>
     <string name="telegram_group_name">Official Telegram</string>
     <string name="telegram_group_desc">@crackhannel</string>
+    <string name="official_website_name">Official Website</string>
+    <string name="official_website_desc">星辰.online</string>
     <string name="no_license_info">No license info</string>
     <string name="loading_doc">Loading document…</string>
     <string name="error_doc_not_found">Document file not found: %s</string>

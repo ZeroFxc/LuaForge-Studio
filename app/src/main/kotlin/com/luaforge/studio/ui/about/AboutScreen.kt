@@ -493,6 +493,74 @@ fun AboutScreen(onBack: () -> Unit) {
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Surface(
+                onClick = {
+                    try {
+                        LogCatcher.i("AboutScreen", "打开官方网站")
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            "https://星辰.online".toUri()
+                        )
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        LogCatcher.e("AboutScreen", "打开官方网站失败", e)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = MaterialTheme.shapes.large
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF5B8DEF),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_studio),
+                                contentDescription = "Website",
+                                modifier = Modifier.size(24.dp),
+                                tint = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.official_website_name),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.official_website_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
         }
 
