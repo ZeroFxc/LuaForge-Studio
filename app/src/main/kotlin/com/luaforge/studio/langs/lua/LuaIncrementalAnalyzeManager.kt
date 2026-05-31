@@ -2,9 +2,12 @@ package com.luaforge.studio.langs.lua
 
 import android.os.Bundle
 import com.luaforge.studio.langs.lua.completion.MyIdentifierAutoComplete
+import com.luaforge.studio.utils.LuaParserUtil
 import io.github.rosemoe.sora.lang.analysis.AsyncIncrementalAnalyzeManager
 import io.github.rosemoe.sora.lang.analysis.IncrementalAnalyzeManager
 import io.github.rosemoe.sora.lang.brackets.SimpleBracketsCollector
+import io.github.rosemoe.sora.lang.diagnostic.DiagnosticDetail
+import io.github.rosemoe.sora.lang.diagnostic.DiagnosticRegion
 import io.github.rosemoe.sora.lang.diagnostic.DiagnosticsContainer
 import io.github.rosemoe.sora.lang.styling.CodeBlock
 import io.github.rosemoe.sora.lang.styling.Span
@@ -16,6 +19,7 @@ import io.github.rosemoe.sora.text.Content
 import io.github.rosemoe.sora.text.ContentReference
 import io.github.rosemoe.sora.util.IntPair
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
+import org.json.JSONObject
 import java.util.Stack
 import java.util.regex.Pattern
 
@@ -94,6 +98,62 @@ class LuaIncrementalAnalyzeManager :
     override fun reset(content: ContentReference, extraArguments: Bundle) {
         super.reset(content, extraArguments)
         identifiers.clear()
+        updateLuaDiagnostics()
+    }
+
+    /**
+     * 更新Lua语法诊断信息
+     * 通过LuaParserUtil解析完整Lua代码内容，将语法错误信息作为编辑器诊断发送
+     * 无语法错误时发送空的诊断容器，确保诊断条不会无故显示
+     */
+    private fun updateLuaDiagnostics() {
+        try {
+            val ref = getContentRef() ?: run {
+                getReceiver()?.setDiagnostics(this, null)
+                return
+            }
+            val content = ref.getReference()
+            val text = content.toString()
+
+            diagnosticsContainer.reset()
+
+            if (text.isBlank()) {
+                getReceiver()?.setDiagnostics(this, diagnosticsContainer)
+                return
+            }
+
+            val result = LuaParserUtil.parse(text)
+            val json = JSONObject(result)
+
+            if (!json.optBoolean("status", true)) {
+                val errorLine = json.optInt("line", 1)
+                val errorMessage = json.optString("message", "Syntax error")
+
+                var lineStart = 0
+                for (i in 0 until (errorLine - 1)) {
+                    val nextNL = text.indexOf('\n', lineStart)
+                    if (nextNL == -1) break
+                    lineStart = nextNL + 1
+                }
+                val nextNL = text.indexOf('\n', lineStart)
+                val lineEnd = if (nextNL == -1) text.length else nextNL
+
+                val detail = DiagnosticDetail(errorMessage, errorMessage)
+                val region = DiagnosticRegion(
+                    lineStart,
+                    lineEnd,
+                    DiagnosticRegion.SEVERITY_ERROR,
+                    0L,
+                    detail
+                )
+                diagnosticsContainer.addDiagnostic(region)
+            }
+
+            getReceiver()?.setDiagnostics(this, diagnosticsContainer)
+        } catch (e: Exception) {
+            diagnosticsContainer.reset()
+            getReceiver()?.setDiagnostics(this, null)
+        }
     }
 
     override fun computeBlocks(
