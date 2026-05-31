@@ -121,7 +121,6 @@ fun CodeEditScreen(
     var showInitialLoader by remember { mutableStateOf(true) }
     var showEditorContent by remember { mutableStateOf(false) }
     var tabBarRendered by remember { mutableStateOf(false) }
-    var loadingStatusText by remember { mutableStateOf("正在准备...") }
     val lastFileToOpen = remember { mutableStateOf<String?>(null) }
 
     var currentOverlay by remember { mutableStateOf<OverlayScreen>(OverlayScreen.NONE) }
@@ -251,16 +250,13 @@ fun CodeEditScreen(
             showInitialLoader = true
             showEditorContent = false
             tabBarRendered = false
-            loadingStatusText = "正在准备..."
             previousProjectPath = projectPath
             previousProjectTimestamp = project.createdDate.time
 
             if (!viewModel.isInitialized) {
-                loadingStatusText = "正在初始化..."
                 viewModel.initialize(context)
             }
 
-            loadingStatusText = "正在加载文件..."
             loadProjectFiles(
                 viewModel = viewModel,
                 projectPath = projectPath,
@@ -270,8 +266,9 @@ fun CodeEditScreen(
             )
 
             showEditorContent = true
+            delay(1800L)
+
             showInitialLoader = false
-            loadingStatusText = "正在准备..."
             viewModel.onInitialLoaderShown()
         }
     }
@@ -675,8 +672,7 @@ fun CodeEditScreen(
                                                     SwipeDirection.DOWN -> true
                                                 }
                                             },
-                                            projectName = project.name,
-                                            loadingStatusText = loadingStatusText
+                                            projectName = project.name
                                         )
                                     }
                                 }
@@ -941,17 +937,28 @@ fun EditorContent(
     symbolBarScrollState: ScrollState,
     quickBarVisible: Boolean,
     onSwipe: (SwipeDirection) -> Unit,
-    projectName: String = "",
-    loadingStatusText: String = ""
+    projectName: String = ""
 ) {
     val scope = rememberCoroutineScope()
     val hasOpenFiles = viewModel.openFiles.isNotEmpty()
     val isCompletionLoading by remember { derivedStateOf { viewModel.isCompletionDataLoading } }
     val completionProgress by remember { derivedStateOf { viewModel.completionDataProgress } }
 
-    Box(modifier = modifier) {
+    Column(modifier = modifier) {
         AnimatedVisibility(
-            visible = showEditorContent,
+            visible = showInitialLoader,
+            exit = fadeOut(tween(350))
+        ) {
+            ProjectLoadingOverlay(
+                projectName = projectName,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = !showInitialLoader && showEditorContent,
             enter = fadeIn(tween(500))
         ) {
             val staggeredStart = remember { mutableStateOf(0) }
@@ -959,7 +966,7 @@ fun EditorContent(
                 staggeredStart.value = 1
             }
 
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxWidth().weight(1f)) {
                 val showProgressBar =
                     isBuilding || isAutoSaving || isCompilingFile || isCompletionLoading || isBackingUp
 
@@ -1064,24 +1071,12 @@ fun EditorContent(
                 }
             }
         }
-
-        AnimatedVisibility(
-            visible = showInitialLoader,
-            exit = fadeOut(tween(500))
-        ) {
-            ProjectLoadingOverlay(
-                projectName = projectName,
-                loadingStatusText = loadingStatusText,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
     }
 }
 
 @Composable
 fun ProjectLoadingOverlay(
     projectName: String,
-    loadingStatusText: String = "",
     modifier: Modifier = Modifier
 ) {
     val alpha = remember { Animatable(0.3f) }
@@ -1125,14 +1120,6 @@ fun ProjectLoadingOverlay(
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha.value)
                 )
-
-                if (loadingStatusText.isNotEmpty()) {
-                    Text(
-                        text = loadingStatusText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = alpha.value)
-                    )
-                }
             }
         }
     }

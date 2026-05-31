@@ -70,6 +70,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import dalvik.system.DexClassLoader;
 
@@ -123,6 +124,7 @@ public class LuaActivity extends AppCompatActivity
   private LuaResources mResources;
   private final ArrayList<LuaGcable> gclist = new ArrayList<LuaGcable>();
   private String pageName = "main";
+  private final AtomicBoolean mDestroyed = new AtomicBoolean(false);
   private static final HashMap<String, LuaActivity> sLuaActivityMap =
       new HashMap<String, LuaActivity>();
   private LuaObject mOnKeyShortcut;
@@ -609,6 +611,7 @@ public class LuaActivity extends AppCompatActivity
 
   @Override
   protected void onDestroy() {
+    if (!mDestroyed.compareAndSet(false, true)) return;
     if (mReceiver != null) unregisterReceiver(mReceiver);
 
     for (LuaGcable obj : gclist) {

@@ -61,6 +61,7 @@ public class LuaService extends Service implements LuaContext, LuaBroadcastRecei
     private final StringBuilder toastbuilder = new StringBuilder();
     private long lastShow;
     private LuaResources mResources;
+    private volatile boolean mDestroyed = false;
 
     private static byte[] readAll(InputStream input) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream(4096);
@@ -335,7 +336,8 @@ public class LuaService extends Service implements LuaContext, LuaBroadcastRecei
 
     @Override
     public void onDestroy() {
-        // TODO: Implement this method
+        if (mDestroyed) return;
+        mDestroyed = true;
         runFunc("onDestroy");
         if (mReceiver != null)
             unregisterReceiver(mReceiver);
