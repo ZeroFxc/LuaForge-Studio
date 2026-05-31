@@ -1,0 +1,20 @@
+LOCAL_PATH := $(call my-dir)
+
+include $(CLEAR_VARS)
+
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/../lua
+
+LOCAL_MODULE := pb
+LOCAL_SRC_FILES := pb.c
+
+LOCAL_CFLAGS := -std=c11 -O3 -fPIC \
+                -Wall \
+                -Wno-unused-parameter \
+                -Wno-unused-function \
+                -Wno-sign-compare
+
+LOCAL_STATIC_LIBRARIES := LXCLuaCore
+
+LOCAL_LDLIBS += -llog
+
+include $(BUILD_SHARED_LIBRARY)
