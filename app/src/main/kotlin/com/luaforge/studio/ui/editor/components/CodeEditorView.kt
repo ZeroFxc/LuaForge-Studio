@@ -219,14 +219,15 @@ fun CodeEditorView(
                 onBackgroundColor = onBackgroundColor,
                 outlineColor = outlineColor,
                 surfaceColor = surfaceColor,
-                onSurfaceColor = onSurfaceColor
+                onSurfaceColor = onSurfaceColor,
+                editor = editor
             )
         }
     }
 
     LaunchedEffect(settingsState.editorFontType, settingsState.customFontPath) {
         if (isEditorReady) {
-            viewModel.updateEditorFonts()
+            viewModel.updateEditorFonts(editor)
         }
     }
 
@@ -240,13 +241,13 @@ fun CodeEditorView(
         settingsState.selectedLineColor
     ) {
         if (isEditorReady) {
-            viewModel.updateEditorSyntaxColors(settingsState)
+            viewModel.updateEditorSyntaxColors(settingsState, editor)
         }
     }
 
     LaunchedEffect(settingsState.indentGuideEnabled) {
         if (isEditorReady) {
-            viewModel.updateEditorIndentGuides()
+            viewModel.updateEditorIndentGuides(editor)
         }
     }
 
@@ -272,7 +273,8 @@ fun CodeEditorView(
             onBackgroundColor = onBackgroundColor,
             outlineColor = outlineColor,
             surfaceColor = surfaceColor,
-            onSurfaceColor = onSurfaceColor
+            onSurfaceColor = onSurfaceColor,
+            editor = editor
         )
     }
 
@@ -368,30 +370,8 @@ fun CodeEditorView(
                     },
                     modifier = Modifier.fillMaxSize(),
                     update = { viewEditor ->
-                        val currentEditorContent = viewEditor.text.toString()
-                        if (currentEditorContent != currentState.content) {
-                            val cursor = viewEditor.cursor
-                            val cursorLine = cursor.leftLine
-                            val cursorColumn = cursor.leftColumn
-                            viewEditor.setText(currentState.content)
-                            LogCatcher.d(
-                                "CodeEditorView",
-                                "AndroidView update 同步内容: ${currentState.file.name}"
-                            )
-                            try {
-                                val lineCount = viewEditor.text.lineCount
-                                val targetLine = cursorLine.coerceIn(0, lineCount - 1)
-                                val lineLength = viewEditor.text.getColumnCount(targetLine)
-                                val targetColumn = cursorColumn.coerceIn(0, lineLength)
-                                viewEditor.setSelection(targetLine, targetColumn)
-                            } catch (e: Exception) {
-                                LogCatcher.e("CodeEditorView", "设置光标位置失败", e)
-                            }
-                        }
-
                         viewEditor.isEnabled = true
                         viewEditor.visibility = android.view.View.VISIBLE
-                        viewEditor.requestLayout()
                     }
                 )
 

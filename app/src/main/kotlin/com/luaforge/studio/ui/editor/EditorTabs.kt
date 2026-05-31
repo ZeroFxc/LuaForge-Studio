@@ -289,7 +289,7 @@ fun FileTabView(
                                 openFiles.forEachIndexed { index, editorState ->
                                     Box {
                                         val isModified by remember(editorState) {
-                                            derivedStateOf { editorState.content != editorState.savedContent }
+                                            derivedStateOf { editorState.isModified }
                                         }
                                         val hasConflict = filenameConflictMap[editorState.file.name] ?: false
                                         val baseDisplayName = getDisplayName(editorState, hasConflict)
@@ -394,7 +394,7 @@ fun FileTabView(
                                     ) {
                                         openFiles.forEachIndexed { index, editorState ->
                                             val isModified by remember(editorState) {
-                                                derivedStateOf { editorState.content != editorState.savedContent }
+                                                derivedStateOf { editorState.isModified }
                                             }
                                             val hasConflict = filenameConflictMap[editorState.file.name] ?: false
                                             val baseDisplayName = getDisplayName(editorState, hasConflict)

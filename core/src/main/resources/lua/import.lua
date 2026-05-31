@@ -16,13 +16,8 @@ local apply = luajava.bindClass
 local dexes = {}
 local _M = {}
 local luacontext = activity or service
-LuaActivity = apply("com.difierline.lua.LuaActivity")
 dexes = luajava.astable(luacontext.getClassLoaders())
 local libs = luacontext.getLibrarys()
-
---增加全局固定变量
-android = {R = apply("android.R")}
-L = activity.getLuaState()
 
 local function libsloader(path)
   local p = libs[path:match("^%a+")]
@@ -80,7 +75,7 @@ local pkgMT = {
       rawset(T, classname, class)
       return class
      else
-      error(classname .. " 不在 " .. rawget(T, "__name") .. " 包中", 2)
+      error(classname .. " is not in " .. rawget(T, "__name"), 2)
     end
   end
 }
@@ -112,9 +107,6 @@ local function append(t, v)
 end
 
 local function local_import(_env, packages, package)
-package=match{package,"com.androlua","com.difierline.lua"}
-package=match{package,"lemon.material","com.difierline.lua.material"}
-package=match{package,"com.flask.colorpicker","com.difierline.lua.colorpicker"}
   local j = package:find(':')
   if j then
     local dexname = package:sub(1, j - 1)
@@ -143,7 +135,7 @@ package=match{package,"com.flask.colorpicker","com.difierline.lua.colorpicker"}
       end
       return class
      else
-      error("找不到 " .. package, 2)
+      error("cannot find " .. package, 2)
     end
   end
 end
@@ -156,7 +148,7 @@ local function env_import(env)
   append(packages, '')
   append(packages, 'java.lang.')
   append(packages, 'java.util.')
-  append(packages, 'com.difierline.lua.')
+  append(packages, 'com.androlua.')
 
   local function import_1(classname)
     for i, p in ipairs(packages) do
@@ -226,7 +218,7 @@ function _M.compile(name)
 end
 
 
-function _M.xenum(e)
+function _M.enum(e)
   return function()
     if e.hasMoreElements() then
       return e.nextElement()
@@ -268,18 +260,19 @@ function _M.dump(o)
           if v == _G then
             insert(t, string.format('\r\n%s%s\t=%s ;', string.rep(space, deep - 1), k, "_G"))
            elseif v ~= package.loaded then
+            local formatted_key
             if tonumber(k) then
-              keyStr = string.format('[%s]', k)
-            else
-              keyStr = string.format('[\"%s\"]', k)
+              formatted_key = string.format('[%s]', k)
+             else
+              formatted_key = string.format('[\"%s\"]', k)
             end
-            insert(t, string.format('\r\n%s%s\t= ', string.rep(space, deep - 1), keyStr))
+            insert(t, string.format('\r\n%s%s\t= ', string.rep(space, deep - 1), formatted_key))
             if v == NIL then
               insert(t, string.format('%s ;',"nil"))
              elseif type(v) == ('table') then
               if _t[tostring(v)] == nil then
                 _t[tostring(v)] = v
-                local _k = _k .. k
+                local _k = _k .. formatted_key
                 _t[tostring(v)] = _k
                 _ToString(v, _k)
                else
@@ -305,7 +298,6 @@ function _M.dump(o)
   return table.concat(t)
 end
 
-
 function _M.printstack()
   local stacks = {}
   for m = 2, 16 do
@@ -320,18 +312,18 @@ function _M.printstack()
     local nups = info.nups
     local ups = {}
     dbs.upvalues = ups
-    for n = 1, nups do
-      local n, v = debug.getupvalue(func, n)
-      if v == nil then
-        v = NIL
+    for i = 1, nups do
+      local name, value = debug.getupvalue(func, i)
+      if value == nil then
+        value = NIL
       end
-      if string.byte(n) == 40 then
-        if ups[n] == nil then
-          ups[n] = {}
+      if string.byte(name) == 40 then
+        if ups[name] == nil then
+          ups[name] = {}
         end
-        insert(ups[n], v)
+        insert(ups[name], value)
        else
-        ups[n] = v
+        ups[name] = value
       end
     end
 
@@ -339,8 +331,8 @@ function _M.printstack()
     dbs.localvalues = lps
     lps.vararg = {}
     --lps.temporary={}
-    for n = -1, -255, -1 do
-      local k, v = debug.getlocal(m, n)
+    for i = -1, -255, -1 do
+      local k, v = debug.getlocal(m, i)
       if k == nil then
         break
       end
@@ -349,23 +341,23 @@ function _M.printstack()
       end
       insert(lps.vararg, v)
     end
-    for n = 1, 255 do
-      local n, v = debug.getlocal(m, n)
-      if n == nil then
+    for i = 1, 255 do
+      local name, value = debug.getlocal(m, i)
+      if name == nil then
         break
       end
-      if v == nil then
-        v = NIL
+      if value == nil then
+        value = NIL
       end
-      if string.byte(n) == 40 then
-        if lps[n] == nil then
-          lps[n] = {}
+      if string.byte(name) == 40 then
+        if lps[name] == nil then
+          lps[name] = {}
         end
-        insert(lps[n], v)
+        insert(lps[name], value)
        else
-        lps[n] = v
+        lps[name] = value
       end
-      --insert(lps,string.format("%s=%s",n,v))
+      --insert(lps,string.format("%s=%s",name,value))
     end
   end
   print(dump(stacks))
@@ -390,9 +382,9 @@ function _M.getids()
   return luajava.ids
 end
 
-local LuaAsyncTask = apply("com.difierline.lua.LuaAsyncTask")
-local LuaThread = apply("com.difierline.lua.LuaThread")
-local LuaTimer = apply("com.difierline.lua.LuaTimer")
+local LuaAsyncTask = apply("com.androlua.LuaAsyncTask")
+local LuaThread = apply("com.androlua.LuaThread")
+local LuaTimer = apply("com.androlua.LuaTimer")
 local Object = apply("java.lang.Object")
 
 
@@ -509,7 +501,5 @@ luajava_mt.__index = function(t, k)
   return ret
 end
 setmetatable(luajava, luajava_mt)
-
-require "debugger"()
 
 return env_import

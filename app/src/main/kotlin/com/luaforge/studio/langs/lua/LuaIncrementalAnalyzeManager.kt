@@ -500,7 +500,17 @@ Tokens.HEX_COLOR -> {
                 Tokens.UNTIL, Tokens.WHILE, Tokens.DO, Tokens.FUNCTION, Tokens.GOTO,
                 Tokens.NIL, Tokens.NOT, Tokens.IMPORT, Tokens.REQUIRE, Tokens.SWITCH,
                 Tokens.LAMBDA, Tokens.CONTINUE, Tokens.DEFAULT, Tokens.NEWCLASS,
-                Tokens.CASE, Tokens.TRY, Tokens.FINALLY, Tokens.CATCH, Tokens.DEFER, Tokens.WHEN -> {
+                Tokens.CASE, Tokens.TRY, Tokens.FINALLY, Tokens.CATCH, Tokens.DEFER, Tokens.WHEN,
+                Tokens.ASM, Tokens.COMMAND, Tokens.CONST, Tokens.ENUM, Tokens.GLOBAL,
+                Tokens.AS, Tokens.IS, Tokens.INSTANCEOF, Tokens.LET, Tokens.TAKE,
+                Tokens.MATCH, Tokens.WITH, Tokens.EXPORT, Tokens.KEYWORD_KW, Tokens.OPERATOR_KW,
+                Tokens.ABSTRACT, Tokens.CLASS, Tokens.EXTENDS, Tokens.FINAL,
+                Tokens.IMPLEMENTS, Tokens.INTERFACE, Tokens.NEW, Tokens.SUPER,
+                Tokens.PRIVATE, Tokens.PROTECTED, Tokens.PUBLIC, Tokens.STATIC,
+                Tokens.ASYNC, Tokens.AWAIT, Tokens.STRUCT, Tokens.SUPERSTRUCT,
+                Tokens.CONCEPT, Tokens.NAMESPACE, Tokens.USING, Tokens.REQUIRES,
+                Tokens.BOOL, Tokens.CHAR, Tokens.DOUBLE, Tokens.FLOAT,
+                Tokens.TYPE_INT, Tokens.LONG, Tokens.VOID -> {
                     classNamePrevious = false
                     SpanFactory.obtain(
                         offset,

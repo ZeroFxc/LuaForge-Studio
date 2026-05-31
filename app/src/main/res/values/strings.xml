@@ -368,6 +368,7 @@
     <string name="code_editor_create">创建</string>
     <string name="code_editor_file_tree">文件树</string>
     <string name="code_editor_no_file_open">未打开任何文件</string>
+    <string name="code_editor_loading_project">正在加载项目…</string>
     <string name="code_editor_close_other">关闭其他</string>
     <string name="code_editor_close_all">关闭全部</string>
     <string name="code_editor_bottom_area_content">底部区域内容</string>
@@ -581,4 +582,12 @@
 
 <string name="code_editor_terminal">终端</string>
 
+    <!-- 启动加载 -->
+    <string name="splash_loading_engine">正在初始化引擎…</string>
+    <string name="splash_loading_libs">正在加载标准库…</string>
+    <string name="splash_running_update">正在执行更新…</string>
+    <string name="splash_extracting_assets">正在解压资源文件…</string>
+    <string name="splash_extracting_lua">正在解压 Lua 模块…</string>
+    <string name="splash_loading_done">加载完成</string>
+    <string name="splash_loading_error">加载出错，将继续启动</string>
 </resources>

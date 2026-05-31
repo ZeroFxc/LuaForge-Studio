@@ -614,6 +614,7 @@ public class LuaActivity extends AppCompatActivity
     for (LuaGcable obj : gclist) {
       obj.gc();
     }
+    gclist.clear();
     sLuaActivityMap.remove(pageName);
     runFunc("onDestroy");
 
@@ -625,9 +626,29 @@ public class LuaActivity extends AppCompatActivity
       }
     }
 
+    if (handler != null) {
+      handler.removeCallbacksAndMessages(null);
+      handler = null;
+    }
+
+    if (layout != null) {
+      layout.removeAllViews();
+      layout = null;
+    }
+
+    isCreate = false;
+    toast = null;
+    list = null;
+    adapter = null;
+    status = null;
+
     super.onDestroy();
     System.gc();
-    L.gc(LuaState.LUA_GCCOLLECT, 1);
+    if (L != null) {
+      L.gc(LuaState.LUA_GCCOLLECT, 1);
+      L.close();
+      L = null;
+    }
   }
 
   @Override
@@ -1105,6 +1126,7 @@ public class LuaActivity extends AppCompatActivity
 
   public Ticker ticker(final LuaObject func, long period) throws LuaException {
     Ticker timer = new Ticker();
+    regGc(timer);
     timer.setOnTickListener(
         new Ticker.OnTickListener() {
           @Override

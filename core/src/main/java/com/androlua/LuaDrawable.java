@@ -10,7 +10,7 @@ import com.luajava.LuaException;
 import com.luajava.LuaFunction;
 import com.luajava.LuaObject;
 
-public class LuaDrawable extends Drawable {
+public class LuaDrawable extends Drawable implements LuaGcable {
 
     private final LuaContext mContext;
     private final LuaObject mDraw;
@@ -18,15 +18,21 @@ public class LuaDrawable extends Drawable {
     private final Paint mPaint;
     private LuaFunction mOnDraw;
 
+    private boolean mGc = false;
+
 
     public LuaDrawable(LuaFunction func) {
         mDraw = func;
         mPaint = new Paint();
         mContext = mDraw.getLuaState().getContext();
+        if (mContext instanceof LuaActivity) {
+            ((LuaActivity) mContext).regGc(this);
+        }
     }
 
     @Override
     public void draw(Canvas p1) {
+        if (mGc) return;
         try {
             if (mOnDraw == null) {
                 Object r = mDraw.call(p1, mPaint, this);
@@ -37,30 +43,39 @@ public class LuaDrawable extends Drawable {
                 mOnDraw.call(p1);
             }
         } catch (LuaException e) {
-            mContext.sendError("onDraw", e);
+            if (!mGc) {
+                mContext.sendError("onDraw", e);
+            }
         }
-        // TODO: Implement this method
     }
 
     @Override
     public void setAlpha(int p1) {
         mPaint.setAlpha(p1);
-        // TODO: Implement this method
     }
 
     @Override
     public void setColorFilter(ColorFilter p1) {
         mPaint.setColorFilter(p1);
-        // TODO: Implement this method
     }
 
     @Override
     public int getOpacity() {
-        // TODO: Implement this method
         return PixelFormat.UNKNOWN;
     }
 
     public Paint getPaint() {
         return mPaint;
+    }
+
+    @Override
+    public void gc() {
+        mGc = true;
+        mOnDraw = null;
+    }
+
+    @Override
+    public boolean isGc() {
+        return mGc;
     }
 }

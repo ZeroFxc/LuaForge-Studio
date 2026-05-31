@@ -30,7 +30,7 @@ local tableConcat = table.concat
 local bindClass = luajava.bindClass
 local newInstance = luajava.newInstance
 local override = luajava.override
-local instanceof = luajava.instanceof
+local instanceofx = luajava.instanceof
 
 local String = bindClass "java.lang.String"
 local AndroidR = bindClass "android.R"
@@ -960,7 +960,7 @@ local function createView(layout, views, parentViewClass)
 
   -- 检查 view 是否是有效的视图类或实例
   local viewClass
-  if instanceof(view, View) then
+  if instanceofx(view, View) then
     viewClass = view.class
   elseif type(view) == "string" then
     -- 如果是字符串，尝试绑定类
@@ -982,7 +982,7 @@ local function createView(layout, views, parentViewClass)
   elseif type(view) == "userdata" then
     -- 处理 userdata 类型的视图
     -- 首先检查它是否已经是 View 实例
-    if instanceof(view, View) then
+    if instanceofx(view, View) then
       viewClass = view.class
     else
       -- 尝试将其作为类处理
@@ -1097,7 +1097,7 @@ function loadlayout(layout, views, parentViewClass)
     if type(k) == "number" and k ~= 1 then
       -- 添加子视图加载的错误信息
       local success, childView = pcall(function()
-        if instanceof(v, View) then
+        if instanceofx(v, View) then
           return v
         else
           return loadlayout(v, views, viewClass)

@@ -1,0 +1,183 @@
+--时间：2025年 6月21日 星期六 00:36:55
+
+-- LUA CODE: Water Ripple Effect (Optimized for Performance)
+
+require "import"
+import "android.app.*"
+import "android.os.*"
+import "android.widget.*"
+import "android.view.*"
+import "android.graphics.Paint"
+import "android.graphics.Color"
+
+-- Bind necessary classes
+local MDC_R = luajava.bindClass "com.google.android.material.R"
+
+--[[
+  ██████╗ ██████╗ ███╗   ██╗███████╗██╗██████╗  ██████╗
+  ██╔══██╗██╔══██╗████╗  ██║██╔════╝██║██╔══██╗██╔════╝
+  ██████╔╝██████╔╝██╔██╗ ██║█████╗  ██║██████╔╝██║  ███╗
+  ██╔═══╝ ██╔══██╗██║╚██╗██║██╔══╝  ██║██╔══██╗██║   ██║
+  ██║     ██║  ██║██║ ╚████║███████╗██║██║  ██║╚██████╔╝
+  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚═╝╚═╝  ╚═╝ ╚═════╝
+-- प्रदर्शन के लिए मानों को संतुलित करें। कम कण और लहरें = अधिक तरलता।
+--]]
+
+local config = {
+  -- कण और ग्रिड सेटिंग्स
+  particleBaseSize   = 4,
+  particleSpacing    = 50,     -- कणों के बीच की दूरी बढ़ाना गणना को कम करता है
+
+  -- लहर भौतिकी प्रभाव
+  rippleMaxAmplitude = 18,
+  rippleWaveLength   = 220,
+  rippleSpeed        = 400,
+  rippleDuration     = 2.8,
+
+  -- रंग और रूप सेटिंग्स
+  backgroundColor    = "0xff1a1a1a",
+  particleBaseColor  = Color.argb(255, 100, 100, 120),
+  highlightColorBoost = { r = 155, g = 155, b = 135 },
+
+  -- प्रदर्शन सेटिंग्स
+  maxRipples         = 15,     -- स्क्रीन पर एक साथ अधिकतम लहरों की संख्या
+}
+
+-- App Setup
+activity
+.setTheme(MDC_R.style.Theme_Material3_DynamicColors_DayNight_NoActionBar)
+.setTitle("जल तरंग प्रभाव (अनुकूलित)")
+.overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out)
+
+-- Layout
+activity.setContentView(loadlayout({
+  LinearLayout;
+  layout_height="fill";
+  layout_width="fill";
+  backgroundColor=config.backgroundColor;
+  {
+    View;
+    layout_height="-1";
+    layout_width="-1";
+    id="canvas";
+  };
+}))
+
+-- Drawing Paint
+local particlePaint = Paint()
+particlePaint.setAntiAlias(true)
+particlePaint.setStyle(Paint.Style.FILL)
+
+-- State
+local particles = {}
+local ripples = {}   -- अब यह एक लहरों का पूल होगा
+local currentRippleIndex = 1
+
+-- लहर पूल को प्रारंभ करें
+for i = 1, config.maxRipples do
+  table.insert(ripples, {
+    active = false,
+    x = 0, y = 0,
+    startTime = 0
+  })
+end
+
+-- कणों के ग्रिड को प्रारंभ करें
+local screenWidth = activity.getWidth()
+local screenHeight = activity.getHeight()
+for y = 1, math.floor(screenHeight / config.particleSpacing) do
+  for x = 1, math.floor(screenWidth / config.particleSpacing) do
+    table.insert(particles, {
+        x = x * config.particleSpacing,
+        y = y * config.particleSpacing,
+        size = config.particleBaseSize,
+        color = config.particleBaseColor
+    })
+  end
+end
+
+-- Drawing Function
+local draw = LuaDrawable(function(canvas, p, canvasv)
+  for _, particle in ipairs(particles) do
+    particlePaint.setColor(particle.color)
+    canvas.drawCircle(particle.x, particle.y, particle.size, particlePaint)
+  end
+  canvasv.invalidateSelf()
+end)
+canvas.setBackground(draw)
+
+-- Touch Handler: पूल से एक लहर को सक्रिय करें
+canvas.onTouch = function(v, event)
+  local action = event.getAction()
+  if action == MotionEvent.ACTION_DOWN or action == MotionEvent.ACTION_MOVE then
+    local ripple = ripples[currentRippleIndex]
+    ripple.active = true
+    ripple.x = event.getX()
+    ripple.y = event.getY()
+    ripple.startTime = os.clock()
+
+    currentRippleIndex = currentRippleIndex + 1
+    if currentRippleIndex > config.maxRipples then
+      currentRippleIndex = 1 -- सूचकांक को रीसेट करें
+    end
+  end
+  return true
+end
+
+-- Animation Timer
+local ti = Ticker()
+ti.Period = 16 -- ~60 FPS
+ti.onTick = function()
+  local currentTime = os.clock()
+
+  -- कॉन्फ़िगरेशन मानों को स्थानीय चर में कैश करें
+  local pBaseSize = config.particleBaseSize
+  local rMaxAmp = config.rippleMaxAmplitude
+  local rWaveLen = config.rippleWaveLength
+  local rSpeed = config.rippleSpeed
+  local rDuration = config.rippleDuration
+  local baseR, baseG, baseB = Color.red(config.particleBaseColor), Color.green(config.particleBaseColor), Color.blue(config.particleBaseColor)
+  local boostR, boostG, boostB = config.highlightColorBoost.r, config.highlightColorBoost.g, config.highlightColorBoost.b
+
+  -- 1. कण अवस्थाओं को अद्यतन करें
+  for _, particle in ipairs(particles) do
+    local totalOffsetRatio = 0
+    local px, py = particle.x, particle.y
+
+    -- केवल सक्रिय लहरों पर लूप चलाएं
+    for _, ripple in ipairs(ripples) do
+      if ripple.active then
+        local elapsedTime = currentTime - ripple.startTime
+        if elapsedTime < rDuration then
+          local dx, dy = px - ripple.x, py - ripple.y
+          -- महंगी sqrt से बचें, दूरी के वर्ग का उपयोग करें
+          local distSq = dx*dx + dy*dy
+          local currentWaveRadius = elapsedTime * rSpeed
+          local waveStartRadius = currentWaveRadius - rWaveLen
+          
+          -- जांचें कि क्या कण लहर के प्रभाव क्षेत्र में है
+          if distSq < currentWaveRadius * currentWaveRadius and (waveStartRadius < 0 or distSq > waveStartRadius * waveStartRadius) then
+            local distance = math.sqrt(distSq) -- केवल आवश्यक होने पर sqrt करें
+            local radian = (distance - currentWaveRadius) / rWaveLen * math.pi * 2
+            local damping = 1 - (elapsedTime / rDuration)
+            totalOffsetRatio = totalOffsetRatio + math.sin(radian) * damping
+          end
+        else
+          ripple.active = false -- लहर को निष्क्रिय करें
+        end
+      end
+    end
+
+    -- गणना किए गए ऑफसेट को कण के आकार और रंग पर लागू करें
+    particle.size = pBaseSize + totalOffsetRatio * rMaxAmp
+
+    local highlight = math.max(0, totalOffsetRatio)
+    local r = math.floor(math.min(255, baseR + boostR * highlight))
+    local g = math.floor(math.min(255, baseG + boostG * highlight))
+    local b = math.floor(math.min(255, baseB * highlight))
+    particle.color = Color.argb(255, r, g, b)
+  end
+end
+
+-- एनीमेशन शुरू करें
+ti.start()

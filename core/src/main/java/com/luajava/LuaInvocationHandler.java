@@ -57,8 +57,18 @@ public class LuaInvocationHandler implements InvocationHandler {
      * Function called when a proxy object function is invoked.
      */
     public Object invoke(Object proxy, Method method, Object[] args) throws LuaException {
-        Log.i("LuaInvocationHandler", "invoke: " + obj + ";" + method + ";" + Arrays.toString(args));
         synchronized (obj.L) {
+            if (obj.L.isClosed()) {
+                String methodName = method.getName();
+                Class<?> retType = method.getReturnType();
+                if (retType.equals(boolean.class) || retType.equals(Boolean.class))
+                    return false;
+                else if (retType.isPrimitive() || Number.class.isAssignableFrom(retType))
+                    return 0;
+                else
+                    return null;
+            }
+
             String methodName = method.getName();
             LuaObject func;
             if (obj.isFunction()) {
@@ -79,7 +89,6 @@ public class LuaInvocationHandler implements InvocationHandler {
 
             Object ret = null;
             try {
-                // Checks if returned type is void. if it is returns null.
                 if (retType.equals(Void.class) || retType.equals(void.class)) {
                     func.call(args);
                     ret = null;

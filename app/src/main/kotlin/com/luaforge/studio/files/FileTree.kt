@@ -593,15 +593,18 @@ private fun FileNodeItem(
         animationSpec = animationSpec
     )
 
-    val children by remember(isExpanded, node) {
-        derivedStateOf {
-            if (isExpanded && node.isDirectory) {
-                node.file.listFiles()
+    var children by remember(isExpanded, node) { mutableStateOf<List<FileNode>>(emptyList()) }
+
+    LaunchedEffect(isExpanded, node) {
+        if (isExpanded && node.isDirectory) {
+            withContext(Dispatchers.IO) {
+                val loaded = node.file.listFiles()
                     ?.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
                     ?.map { FileNode(file = it, isDirectory = it.isDirectory) }
                     ?: emptyList()
-            } else {
-                emptyList()
+                withContext(Dispatchers.Main) {
+                    children = loaded
+                }
             }
         }
     }

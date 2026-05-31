@@ -1,7 +1,5 @@
---- 布局加载模块
+--- Layout loading module
 ---@author Xiayu372
----@updater DifierLine
----@version 2.0.0
 
 -- global to local
 local require = require
@@ -36,7 +34,6 @@ local override = luajava.override
 local instanceofx = luajava.instanceof
 
 local String = bindClass "java.lang.String"
-local AndroidR = bindClass "android.R"
 local View = bindClass "android.view.View"
 local ViewGroup = bindClass "android.view.ViewGroup"
 local Color = bindClass "android.graphics.Color"
@@ -49,12 +46,12 @@ local TooltipCompat = bindClass "androidx.appcompat.widget.TooltipCompat"
 local PagerAdapter = bindClass "androidx.viewpager.widget.PagerAdapter"
 local MaterialColors = bindClass "com.google.android.material.color.MaterialColors"
 local MaterialR = bindClass "com.google.android.material.R"
-local NineBitmapDrawable = bindClass "com.difierline.lua.NineBitmapDrawable"
-local LuaBitmapDrawable = bindClass "com.difierline.lua.LuaBitmapDrawable"
-local LuaBitmap = bindClass "com.difierline.lua.LuaBitmap"
+local NineBitmapDrawable = bindClass "com.androlua.NineBitmapDrawable"
+local LuaBitmapDrawable = bindClass "com.androlua.LuaBitmapDrawable"
 local Glide = bindClass "com.bumptech.glide.Glide"
 local DiskCacheStrategy = bindClass "com.bumptech.glide.load.engine.DiskCacheStrategy"
 local RequestOptions = bindClass "com.bumptech.glide.request.RequestOptions"
+local LuaPagerAdapter = bindClass "github.daisukiKaffuChino.LuaPagerAdapter"
 
 local loadlayout
 local scaleTypeEnum = ScaleType.values()
@@ -117,7 +114,7 @@ local ruleConstants = {
   layout_toStartOf = 16
 }
 
--- 添加ConstraintLayout约束设置器
+-- Add ConstraintLayout constraint setters
 local constraintSetters = {
   layout_constraintStart_toStartOf = function(layoutParams, value)
     layoutParams.startToStart = value
@@ -215,7 +212,7 @@ local layoutBehaviorConstants = {
   hide_bottom_view_on_scroll_behavior = "com.google.android.material.behavior.HideBottomViewOnScrollBehavior"
 }
 
--- 定义过且一样的值或者改成if判断的值会注释掉
+-- Defined and identical values or values changed to if judgments are commented out
 local viewConstants = {
   -- android:drawingCacheQuality
   -- auto = 0,
@@ -353,7 +350,7 @@ local dimensionConverterMap = {
   ["%h"] = function(v) return heightPixels * v * 0.01 end
 }
 
--- 让require可以导入aly后缀的文件
+-- Make require able to import files with .aly extension
 local function alyloader(path)
   local alypath = stringGsub(package.path, "%.lua;", ".aly;")
   local path, msg = package.searchpath(path, alypath)
@@ -373,7 +370,7 @@ local function alyloader(path)
 end
 tableInsert(package.searchers, alyloader)
 
---- 把表转换为字符串
+--- Convert a table to a string
 ---@param t table
 ---@return string
 local function dump(t)
@@ -392,8 +389,8 @@ local function dump(t)
   return tableConcat(_t, "\n")
 end
 
-local dimensionCache = {} -- 缓存尺寸计算结果
---- 把尺寸转换为对应的px
+local dimensionCache = {} -- Cache dimension calculation results
+--- Convert dimension to corresponding px
 ---@param value string|number
 ---@return number
 local function parseDimension(value)
@@ -401,40 +398,40 @@ local function parseDimension(value)
   if result then return result end
 
   local num, unit = stringMatch(value, "([%+%-]?[%d%.]+)([%%%a]+)")
-  num = assert(tonumber(num), "未知尺寸 " .. value)
+  num = assert(tonumber(num), "Unknown dimension " .. value)
 
   local converter = dimensionConverterMap[unit]
   if converter then
     result = converter(num)
    else
-    error("未知尺寸 " .. value, 2)
+    error("Unknown dimension " .. value, 2)
   end
 
   dimensionCache[value] = result
   return result
 end
 
---- 解析大小
+--- Parse size
 ---@param value string|number
 ---@return number
 local function parseSize(value)
   return sizeConstants[value] or parseDimension(value)
 end
 
---- 获取R类中代表颜色的attr
----@param color string 颜色名
+--- Get color attr from R class
+---@param color string Color name
 ---@return number
 local function getColorAttr(color)
   local success, result = pcall(function() return MaterialR.attr[color] end)
   if success then return result end
 
-  success, result = pcall(function() return AndroidR.attr[color] end)
+  success, result = pcall(function() return android.R.attr[color] end)
   if success then return result end
 
-  error("未知颜色 " .. color, 2)
+  error("Unknown color " .. color, 2)
 end
 
---- 把颜色值解析为十六进制数
+--- Parse color value to hexadecimal number
 ---@param value string|number
 ---@return number
 local function parseColor(value)
@@ -449,12 +446,12 @@ local function parseColor(value)
     end
   end
 
-  error("未知颜色: " .. value, 2)
+  error("Unknown color: " .. value, 2)
 end
 
---- 解析常量文本
----@param value string|number 需要解析的常量值
----@param constants table 在此表中查询常量
+--- Parse constant text
+---@param value string|number Constant value to parse
+---@param constants table Look up constants in this table
 ---@return number
 local function parseConstants(value, constants)
   local result = tonumber(value)
@@ -463,13 +460,13 @@ local function parseConstants(value, constants)
   result = 0
   for item in (value .. "|"):gmatch("(.-)|") do
     local newItem = constants[item] or tonumber(item)
-    assert(newItem, "未知值 " .. item)
+    assert(newItem, "Unknown value " .. item)
     result = result | newItem
   end
   return result
 end
 
---- 解析任意值
+--- Parse any value
 ---@param value any
 ---@return any
 local function parseValue(value)
@@ -489,7 +486,7 @@ local function parseValue(value)
       return Color.parseColor(value)
     end
 
-    -- 解析尺寸
+    -- Parse dimension
     local num, unit = stringMatch(value, "([%+%-]?[%d%.]+)([%%%a]+)")
     num = tonumber(num)
     if num and unit then
@@ -503,7 +500,7 @@ local function parseValue(value)
       end
     end
 
-    -- 解析常量
+    -- Parse constants
     result = 0
     for item in (value.."|"):gmatch("(.-)|") do
       local newItem = viewConstants[item] or tonumber(item)
@@ -520,7 +517,7 @@ local function parseValue(value)
   return value
 end
 
---- 解析表中所有值
+--- Parse all values in a table
 ---@param value table
 ---@return any
 local function parseValues(value)
@@ -530,41 +527,14 @@ local function parseValues(value)
   return tableUnpack(value)
 end
 
---- 用于ViewPager
----@param pageViews table
----@param pageTitles table
----@return PagerAdapter
-local function LuaPagerAdapter(pageViews, pageTitles)
-  return override(PagerAdapter, {
-    getCount = function(super)
-      return int(#pageViews)
-    end,
-    instantiateItem = function(super, container, position)
-      local pageView = pageViews[position + 1]
-      container.addView(pageView)
-      return pageView
-    end,
-    destroyItem = function(super, container, position, object)
-      local pageView = pageViews[position + 1]
-      container.removeView(pageView)
-    end,
-    isViewFromObject = function(super, view, object)
-      return view == object
-    end,
-    getPageTitle = pageTitles and function(super, position)
-      return pageTitles[position + 1]
-    end or nil
-  })
-end
-
--- 存储设置属性方法的表
+-- Store table of attribute setting methods
 local attributeSetterMap = {
   items = function(view, value)
     local adapter = view.getAdapter()
     if adapter then
       adapter.addAll(value)
      else
-      adapter = ArrayListAdapter(activity, AndroidR.layout.simple_list_item_1, String(value))
+      adapter = ArrayListAdapter(activity, android.R.layout.simple_list_item_1, String(value))
       view.setAdapter(adapter)
     end
   end,
@@ -575,30 +545,16 @@ local attributeSetterMap = {
       pages[k] = (vType == "string" or vType == "table") and
       loadlayout(v, views) or v
     end
-    view.post(function()
-      view.setAdapter(LuaPagerAdapter(pages))
-    end)
+    view.setAdapter(LuaPagerAdapter(pages))
   end,
   pagesWithTitle = function(view, value, valueType, layoutParams, views)
-    --[[
-        pagesWithTitle = {
-          {
-            pages...
-          },
-          {
-            title...
-          }
-        }
-        ]]
     local pages = {}
     for k, v in ipairs(value[1]) do
       local vType = type(v)
       pages[k] = (vType == "string" or vType == "table") and
       loadlayout(v, views) or v
     end
-    view.post(function()
-      view.setAdapter(LuaPagerAdapter(pages, value[2]))
-    end)
+    view.setAdapter(LuaPagerAdapter(pages, value[2]))
   end,
   background = function(view, value, valueType)
     if valueType == "string" then
@@ -816,17 +772,17 @@ local attributeSetterMap = {
   end,
 }
 
---- 给控件设置属性
----@param view View 需要设置的控件实例
----@param attribute string 需要设置的属性
----@param value any 属性的值
----@param layoutParams LayoutParams 控件的LayoutParams
----@param views table 存储控件实例的表
----@param deferredSet table 延迟设置表
+--- Set attributes for a view
+---@param view View View instance to set
+---@param attribute string Attribute to set
+---@param value any Attribute value
+---@param layoutParams LayoutParams View's LayoutParams
+---@param views table Table storing view instances
+---@param deferredSet table Deferred setting table
 local function setAttribute(view, attribute, value, layoutParams, views, deferredSet)
   local valueType = type(value)
 
-  -- 处理ConstraintLayout约束属性
+  -- Handle ConstraintLayout constraint attributes
   local constraintSetter = constraintSetters[attribute]
   if constraintSetter then
     if value == "parent" then
@@ -861,7 +817,7 @@ local function setAttribute(view, attribute, value, layoutParams, views, deferre
     return
   end
 
-  -- 判断是否是LayoutParams的属性
+  -- Check if it's a LayoutParams attribute
   local layoutParamsAttribute = stringMatch(attribute, "layout_(%a+)")
   if layoutParamsAttribute then
     attribute = layoutParamsAttribute
@@ -869,21 +825,21 @@ local function setAttribute(view, attribute, value, layoutParams, views, deferre
   end
 
   if valueType == "table" then
-    -- table类型的属性没法省略set
+    -- Table type attributes cannot omit set
     view["set" .. stringGsub(attribute, "^(%a)", stringUpper)](parseValues(value))
    else
-    -- 尝试调用setter
+    -- Try to call setter
     local success, err = pcall(function()
       view["set" .. stringGsub(attribute, "^(%a)", stringUpper)](parseValue(value))
     end)
     if not success then
-      -- 尝试直接赋值
+      -- Try direct assignment
       view[attribute] = parseValue(value)
     end
   end
 end
 
---- 设置控件的内边距
+--- Set padding for a view
 ---@param layout: table
 ---@param view: View
 local function setPadding(layout, view)
@@ -913,7 +869,7 @@ local function setPadding(layout, view)
   end
 end
 
---- 设置控件的外边距
+--- Set margins for a view
 ---@param layout: table
 ---@param layoutParams: ViewGroup.LayoutParams
 local function setMargins(layout, layoutParams)
@@ -934,14 +890,16 @@ local function setMargins(layout, layoutParams)
   end
 end
 
---- 创建并初始化视图
+--- Create and initialize a view
 ---@param layout: table
 ---@return View
 ---@return ViewGroup.LayoutParams
 local function createView(layout, views, parentViewClass)
-  -- 添加详细的错误信息
+  -- Add detailed error information
   if not layout[1] then
     local layoutInfo = ""
+    
+    -- Show all keys and values of layout table (simplified)
     local count = 0
     for k, v in pairs(layout) do
         if type(k) == "string" then
@@ -954,20 +912,14 @@ local function createView(layout, views, parentViewClass)
         count = count + 1
     end
     
-    error(stringFormat([[
-[X] 布局表中缺少第一个值（视图类名或实例）
-
-[Info] 找到的布局属性（共 %d 个）：
-%s
-[Tip] 可能的原因和解决方法：
-   1. 布局表第一个元素必须是视图类名（如 Button）
-   2. 或者是已存在的 View 实例
-   3. 或者是包含 __class 字段的 Lua 类表
-
-]], count, layoutInfo), 2)
+    error(stringFormat(
+      "Layout table missing first value (view class name or instance).\n" ..
+      "Found layout attributes:\n%s",
+      layoutInfo
+    ), 2)
   end
   
-  local view = layout[1]
+  local view = layout[1]  -- Remove assert because we already checked above
   local theme = layout.theme
   local style = layout.style
   local context = theme and
@@ -978,20 +930,15 @@ local function createView(layout, views, parentViewClass)
     style = stringSub(style, 1, 1) == "?" and
     activity.getResources().getIdentifier(stringSub(style, 2), "attr", activity.getPackageName()) or
     activity.getResources().getIdentifier(style, "style", activity.getPackageName())
-    assert(style ~= 0, stringFormat([[
-[X] 未知样式: %s
-[Tip] 可能的原因和解决方法：
-   1. 样式名称拼写错误
-   2. 样式未定义
-]], layout.style))
+    assert(style ~= 0, "Unknown style " .. layout.style)
   end
 
-  -- 检查 view 是否是有效的视图类或实例
+  -- Check if view is a valid view class or instance
   local viewClass
   if instanceofx(view, View) then
     viewClass = view.class
   elseif type(view) == "string" then
-    -- 如果是字符串，尝试绑定类
+    -- If string, try to bind class
     local success, result = pcall(bindClass, view)
     if success then
       viewClass = result
@@ -999,29 +946,21 @@ local function createView(layout, views, parentViewClass)
       viewClass(context, nil, style) or
       viewClass(context)
     else
-      error(stringFormat([[
-[X] 未知视图类: %s
-
-[Tip] 可能的原因和解决方法：
-   1. 类名拼写错误
-   2. 未使用 import 导入该类
-   3. 该类可能不在当前 ClassLoader 中
-
-]], view), 2)
+      error("Unknown view class: " .. view, 2)
     end
   elseif type(view) == "table" and view.__class then
-    -- 处理 Lua 类
+    -- Handle Lua class
     viewClass = view
     view = style and
     viewClass(context, nil, style) or
     viewClass(context)
   elseif type(view) == "userdata" then
-    -- 处理 userdata 类型的视图
-    -- 首先检查它是否已经是 View 实例
+    -- Handle userdata type view
+    -- First check if it's already a View instance
     if instanceofx(view, View) then
       viewClass = view.class
     else
-      -- 尝试将其作为类处理
+      -- Try to handle it as a class
       local success, instance = pcall(function()
         return style and view(context, nil, style) or view(context)
       end)
@@ -1030,11 +969,12 @@ local function createView(layout, views, parentViewClass)
         view = instance
         viewClass = view.class
       else
-        -- 如果无法创建实例，尝试直接使用
+        -- If cannot create instance, try to use directly
         viewClass = view
       end
     end
   elseif type(view) == "function" then
+    -- Handle function type, call function to create view
     local success, instance = pcall(function()
       return style and view(context, nil, style) or view(context)
     end)
@@ -1042,28 +982,10 @@ local function createView(layout, views, parentViewClass)
       view = instance
       viewClass = view.class
     else
-      error(stringFormat([[
-[X] 从函数创建视图失败
-
-[Info] 函数信息: %s
-[Tip] 可能的原因和解决方法：
-   1. 函数内部发生异常
-   2. 函数返回的不是 View 实例
-   3. 函数参数不匹配
-
-]], tostring(view)), 2)
+      error("Failed to create view from function: " .. tostring(view), 2)
     end
   else
-    error(stringFormat([[
-[X] 无效的视图类型: %s
-[Info] 当前类型: %s
-[Tip] 有效的视图类型包括：
-   * string    - 视图类名最后一个索引名（如 Button）
-   * userdata  - 已存在的 View 实例
-   * table     - 包含 __class 的 Lua 类
-   * function  - 返回 View 的函数
-
-]], type(view), type(view)), 2)
+    error("Invalid view type: " .. type(view), 2)
   end
 
   view.setId(layout.viewId or View.generateViewId())
@@ -1072,13 +994,13 @@ local function createView(layout, views, parentViewClass)
     views[id] = view
   end
 
-  -- 创建基础 LayoutParams
+  -- Create base LayoutParams
   local baseLayoutParams = ViewGroup.LayoutParams(
     parseSize(layout.layout_width or -2),
     parseSize(layout.layout_height or -2)
   )
 
-  -- 如果是特殊视图组，尝试创建对应的 LayoutParams
+  -- If it's a special ViewGroup, try to create corresponding LayoutParams
   local layoutParams = baseLayoutParams
   if parentViewClass and parentViewClass ~= ViewGroup then
     local success, result = pcall(function()
@@ -1087,7 +1009,7 @@ local function createView(layout, views, parentViewClass)
     if success then
       layoutParams = result
      else
-      -- 如果转换失败，尝试直接创建
+      -- If conversion fails, try to create directly
       success, result = pcall(function()
         return parentViewClass.LayoutParams(
           parseSize(layout.layout_width or -2),
@@ -1097,8 +1019,8 @@ local function createView(layout, views, parentViewClass)
       if success then
         layoutParams = result
        else
-        -- 如果还是失败，使用基础 LayoutParams
-        -- print("警告: 无法为 " .. tostring(parentViewClass) .. " 创建特定的 LayoutParams，使用默认的 ViewGroup.LayoutParams")
+        -- If still fails, use base LayoutParams
+        -- print("Warning: Cannot create specific LayoutParams for " .. tostring(parentViewClass) .. ", using default ViewGroup.LayoutParams")
       end
     end
   end
@@ -1109,23 +1031,14 @@ local function createView(layout, views, parentViewClass)
   return view, layoutParams, viewClass
 end
 
---- 获取布局表
+--- Get layout table
 ---@param layout: table|string|userdata
 ---@return table
 local function getLayoutTable(layout)
   if type(layout) == "string" then
     local success, result = pcall(require, layout)
     if not success then
-      error(stringFormat([[
-[X] 【布局加载错误】加载布局文件失败: %s
-
-[Info] 错误详情: %s
-[Tip] 可能的原因和解决方法：
-   1. 布局文件路径错误
-   2. 布局文件不存在
-   3. 布局文件中有语法错误
-   4. 模块名称拼写错误
-]], layout, tostring(result)), 2)
+      error("Failed to load layout file: " .. layout .. "\nError: " .. tostring(result), 2)
     end
     layout = result
   end
@@ -1137,26 +1050,19 @@ local function getLayoutTable(layout)
     if success then return result end
   end
   
-  error(stringFormat([[
-[X] loadlayout 需要一个表，实际得到: %s
-[Info] 当前类型: %s
-[Tip] 可能的原因和解决方法：
-   1. 传入的参数类型错误
-   2. require 返回的不是表
-   3. 布局模块未正确导出
-]], type(layout), type(layout)), 2)
+  error("loadlayout expects a table, got: " .. type(layout), 2)
 end
 
---- 将布局表转换为视图实例
----@param layout table 布局表
----@param views table 存储控件实例的表
----@param parentViewClass ViewGroup 父控件的类
+--- Convert layout table to view instance
+---@param layout table Layout table
+---@param views table Table storing view instances
+---@param parentViewClass ViewGroup Parent view's class
 function loadlayout(layout, views, parentViewClass)
   layout = getLayoutTable(layout)
   views = views or _G
   local view, layoutParams, viewClass = createView(layout, views, parentViewClass)
 
-  -- 重置延迟设置表（改为局部变量，避免递归调用时互相干扰）
+  -- Reset deferred set (changed to local variable to avoid interference during recursive calls)
   local deferredSet = {}
 
   for k, v in pairs(layout) do
@@ -1164,6 +1070,7 @@ function loadlayout(layout, views, parentViewClass)
       goto _continue_
     end
     if type(k) == "number" and k ~= 1 then
+      -- Add error information for child view loading
       local success, childView = pcall(function()
         if instanceofx(v, View) then
           return v
@@ -1173,43 +1080,24 @@ function loadlayout(layout, views, parentViewClass)
       end)
       
       if not success then
-        error(stringFormat([[
-[Info] 错误位置: 索引 [%d]
-[Tip] 可能的原因和解决方法：
-   1. 子布局格式错误
-   2. 子布局中使用了不存在的视图类
-   3. 子布局中有语法错误
-   4. 递归加载时出现异常
-[Debug] 错误详情：
-%s
-]], k, childView), 0)
+        -- Simplify error message
+        error("Error loading child view at index[" .. k .. "]:\n" .. childView, 0)
       end
       
       view.addView(childView)
      else
+      -- Set attribute and handle errors (pass deferredSet)
       local e, s = pcall(setAttribute, view, k, v, layoutParams, views, deferredSet)
       if not e then
-        error(stringFormat([[
-[X] 设置视图属性失败
-
-[Info] 视图类: %s
-[Info] 属性键: %s
-[Info] 属性值: %s
-[Tip] 可能的原因和解决方法：
-   1. 属性名称拼写错误（注意大小写）
-   2. 属性值格式错误
-   3. 属性值类型不匹配
-   4. 该视图不支持此属性
-[Debug] 原始错误：
-%s
-=================================================
-]], tostring(layout[1]), k, tostring(v), s), 0)
+        local _, i = stringFind(s, ":%d+:")
+        s = stringSub(s, i or 1)
+        error("Layout loading error: " .. s .. " key='" .. k .. "' value='" .. tostring(v) .. "'", 0)
       end
     end
 ::_continue_::
   end
 
-  -- 处理延迟设置（ConstraintLayout约束和RelativeLayout规则）
+  -- Handle deferred settings (ConstraintLayout constraints and RelativeLayout rules)
   for _, item in ipairs(deferredSet) do
     if item.rule then
       item.layoutParams.addRule(item.rule, views[item.value].getId())

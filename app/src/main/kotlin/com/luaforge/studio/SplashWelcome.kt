@@ -5,8 +5,6 @@ import android.content.SharedPreferences
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,7 +25,9 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.androlua.LuaApplication
@@ -42,7 +43,11 @@ import com.luajava.LuaFunction
 import com.luajava.LuaStateFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -52,6 +57,20 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+
+enum class LoadingPhase {
+    IDLE,
+    INIT_ENGINE,
+    RUNNING_UPDATE,
+    EXTRACTING,
+    COMPLETE
+}
+
+data class LoadingState(
+    val phase: LoadingPhase = LoadingPhase.IDLE,
+    val progress: Float = 0f,
+    val message: String = ""
+)
 
 class SplashWelcome : ComponentActivity() {
 
@@ -66,6 +85,7 @@ class SplashWelcome : ComponentActivity() {
     private var mOldVersionName: String = ""
 
     private val isExtracting = AtomicBoolean(false)
+    private val _loadingState = MutableStateFlow(LoadingState())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -100,7 +120,6 @@ class SplashWelcome : ComponentActivity() {
 
         coroutineScope {
             launch(Dispatchers.IO) {
-                // 根据版本是否变更，决定是强制重新加载还是普通初始化
                 if (isVersionChanged) {
                     CompletionDataManager.reload(this@SplashWelcome)
                 } else {
@@ -192,9 +211,10 @@ class SplashWelcome : ComponentActivity() {
             AppThemeWithObserver {
                 SplashScreen(
                     shouldUpdate = shouldUpdate,
+                    loadingState = _loadingState,
                     onCheckComplete = { shouldUpdateInner ->
                         if (shouldUpdateInner) {
-                            checkAndStartUpdate()
+                            startLoadingWithProgress()
                         } else {
                             startMainActivity()
                         }
@@ -204,34 +224,84 @@ class SplashWelcome : ComponentActivity() {
         }
     }
 
-    private fun checkAndStartUpdate() {
-        val executor = Executors.newSingleThreadExecutor()
-        val handler = Handler(Looper.getMainLooper())
-        executor.execute {
-            onUpdate()
-            handler.post { startMainActivity() }
-        }
-        executor.shutdown()
-    }
+    /**
+     * 带进度反馈的异步加载流程
+     * 步骤: 初始化引擎 → 执行更新脚本 → 解压资源 → 解压Lua模块 → 完成
+     */
+    private fun startLoadingWithProgress() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // 阶段1: 初始化 Lua 引擎 (这里会加载 20MB 的 libLXCLuaCore.so)
+                _loadingState.value = LoadingState(
+                    phase = LoadingPhase.INIT_ENGINE,
+                    progress = 0.05f,
+                    message = getString(R.string.splash_loading_engine)
+                )
 
-    private fun onUpdate() {
-        val L = LuaStateFactory.newLuaState()
-        L.openLibs()
-        try {
-            if (L.LloadBuffer(LuaUtil.readAsset(this, "update.lua"), "update") == 0) {
-                if (L.pcall(0, 0, 0) == 0) {
-                    (L.getFunction("onUpdate") as? LuaFunction)?.call(mVersionName, mOldVersionName)
+                val L = LuaStateFactory.newLuaState()
+
+                _loadingState.value = LoadingState(
+                    phase = LoadingPhase.INIT_ENGINE,
+                    progress = 0.25f,
+                    message = getString(R.string.splash_loading_libs)
+                )
+                L.openLibs()
+
+                // 阶段2: 执行更新脚本
+                _loadingState.value = LoadingState(
+                    phase = LoadingPhase.RUNNING_UPDATE,
+                    progress = 0.35f,
+                    message = getString(R.string.splash_running_update)
+                )
+                try {
+                    if (L.LloadBuffer(LuaUtil.readAsset(this@SplashWelcome, "update.lua"), "update") == 0) {
+                        if (L.pcall(0, 0, 0) == 0) {
+                            (L.getFunction("onUpdate") as? LuaFunction)?.call(mVersionName, mOldVersionName)
+                        }
+                    }
+                } catch (_: Exception) {
+                    // Update script execution failed, continue with extraction
+                }
+
+                // 阶段3: 解压资源
+                _loadingState.value = LoadingState(
+                    phase = LoadingPhase.EXTRACTING,
+                    progress = 0.50f,
+                    message = getString(R.string.splash_extracting_assets)
+                )
+                unApk("assets", localDir)
+
+                // 阶段4: 解压 Lua 模块
+                _loadingState.value = LoadingState(
+                    phase = LoadingPhase.EXTRACTING,
+                    progress = 0.75f,
+                    message = getString(R.string.splash_extracting_lua)
+                )
+                unApk("lua", luaMdDir)
+
+                // 完成
+                _loadingState.value = LoadingState(
+                    phase = LoadingPhase.COMPLETE,
+                    progress = 1f,
+                    message = getString(R.string.splash_loading_done)
+                )
+                delay(400)
+
+                withContext(Dispatchers.Main) {
+                    startMainActivity()
+                }
+            } catch (e: Exception) {
+                LogCatcher.e("SplashWelcome", "加载失败", e)
+                _loadingState.value = LoadingState(
+                    phase = LoadingPhase.COMPLETE,
+                    progress = 1f,
+                    message = getString(R.string.splash_loading_error)
+                )
+                delay(800)
+                withContext(Dispatchers.Main) {
+                    startMainActivity()
                 }
             }
-        } catch (_: Exception) {
-            // Update script execution failed, continue with extraction
-        }
-
-        try {
-            unApk("assets", localDir)
-            unApk("lua", luaMdDir)
-        } catch (_: IOException) {
-            // Extraction failed
         }
     }
 
@@ -249,9 +319,9 @@ class SplashWelcome : ComponentActivity() {
         val threadPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
         val i = dir.length + 1
         val destPath = extDir
-        
+
         var zipFile: ZipFile? = null
-        
+
         try {
             zipFile = ZipFile(applicationInfo.publicSourceDir)
             val entries = zipFile.entries()
@@ -350,11 +420,14 @@ class SplashWelcome : ComponentActivity() {
 @Composable
 fun SplashScreen(
     shouldUpdate: Boolean,
+    loadingState: StateFlow<LoadingState>,
     onCheckComplete: (Boolean) -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition()
+    val state by loadingState.collectAsState()
 
-    val progress by infiniteTransition.animateFloat(
+    val showIndeterminate = !shouldUpdate || state.phase == LoadingPhase.IDLE
+
+    val indeterminateProgress by rememberInfiniteTransition().animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
@@ -378,7 +451,7 @@ fun SplashScreen(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(32.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -397,20 +470,60 @@ fun SplashScreen(
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .clipToBounds()
-            ) {
-                LinearProgressIndicator(
-                    progress = 1f,
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                )
-                LinearProgressIndicator(
-                    progress = progress,
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary
+            if (showIndeterminate) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .clipToBounds()
+                ) {
+                    LinearProgressIndicator(
+                        progress = 1f,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    )
+                    LinearProgressIndicator(
+                        progress = indeterminateProgress,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.6f)
+                            .clipToBounds()
+                    ) {
+                        LinearProgressIndicator(
+                            progress = 1f,
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                        )
+                        LinearProgressIndicator(
+                            progress = state.progress,
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Text(
+                        text = "${(state.progress * 100).toInt()}%",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            if (state.message.isNotEmpty()) {
+                Text(
+                    text = state.message,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center
                 )
             }
         }

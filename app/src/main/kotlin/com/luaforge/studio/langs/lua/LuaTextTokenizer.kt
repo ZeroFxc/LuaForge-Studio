@@ -44,7 +44,14 @@ class LuaTextTokenizer {
                 "default", "call", "collectgarbage", "compile", "coroutine", "assert", "error",
                 "ipairs", "pairs", "next", "print", "rawequal", "rawget", "rawset", "select",
                 "setmetatable", "getmetatable", "tonumber", "tostring", "type", "unpack",
-                "lambda", "newClass", "_G", "try", "finally", "catch", "defer", "when"
+                "lambda", "newClass", "_G", "try", "finally", "catch", "defer", "when",
+                "asm", "command", "const", "enum", "global", "as", "is", "instanceof",
+                "let", "take", "match", "with", "export", "keyword", "operator",
+                "abstract", "class", "extends", "final", "implements", "interface",
+                "new", "super", "private", "protected", "public", "static",
+                "async", "await", "struct", "superstruct", "concept", "namespace",
+                "using", "requires",
+                "bool", "char", "double", "float", "int", "long", "void"
             )
 
             val sTokens = arrayOf(
@@ -58,7 +65,17 @@ class LuaTextTokenizer {
                 Tokens.PRINT, Tokens.RAWEQUAL, Tokens.RAWGET, Tokens.RAWSET, Tokens.SELECT,
                 Tokens.SETMETATABLE, Tokens.GETMETATABLE, Tokens.TONUMBER, Tokens.TOSTRING,
                 Tokens.TYPE, Tokens.UNPACK, Tokens.LAMBDA, Tokens.NEWCLASS, Tokens._G,
-                Tokens.TRY, Tokens.FINALLY, Tokens.CATCH, Tokens.DEFER, Tokens.WHEN
+                Tokens.TRY, Tokens.FINALLY, Tokens.CATCH, Tokens.DEFER, Tokens.WHEN,
+                Tokens.ASM, Tokens.COMMAND, Tokens.CONST, Tokens.ENUM, Tokens.GLOBAL,
+                Tokens.AS, Tokens.IS, Tokens.INSTANCEOF, Tokens.LET, Tokens.TAKE,
+                Tokens.MATCH, Tokens.WITH, Tokens.EXPORT, Tokens.KEYWORD_KW, Tokens.OPERATOR_KW,
+                Tokens.ABSTRACT, Tokens.CLASS, Tokens.EXTENDS, Tokens.FINAL,
+                Tokens.IMPLEMENTS, Tokens.INTERFACE, Tokens.NEW, Tokens.SUPER,
+                Tokens.PRIVATE, Tokens.PROTECTED, Tokens.PUBLIC, Tokens.STATIC,
+                Tokens.ASYNC, Tokens.AWAIT, Tokens.STRUCT, Tokens.SUPERSTRUCT,
+                Tokens.CONCEPT, Tokens.NAMESPACE, Tokens.USING, Tokens.REQUIRES,
+                Tokens.BOOL, Tokens.CHAR, Tokens.DOUBLE, Tokens.FLOAT,
+                Tokens.TYPE_INT, Tokens.LONG, Tokens.VOID
             )
 
             keywords = TrieTree()
@@ -292,308 +309,201 @@ class LuaTextTokenizer {
     }
 
     protected fun scanOther(ch2: Char): Tokens {
-        var nextch: Char = 0.toChar()
-        if (offset + 1 < bufferLen) {
-            nextch = source[offset + 1]
-        }
+    var nextch: Char = 0.toChar()
+    if (offset + 1 < bufferLen) {
+        nextch = source[offset + 1]
+    }
 
-        // 处理三字符运算符
-        if (offset + 2 < bufferLen) {
-            val threeCharSeq = source.subSequence(offset, offset + 3).toString()
-            when (threeCharSeq) {
-                "<--" -> {
-                    length = 3
-                    return Tokens.ARROW_LEFT_LONG
-                }
+    // 处理三字符运算符
+    if (offset + 2 < bufferLen) {
+        val threeCharSeq = source.subSequence(offset, offset + 3).toString()
+        when (threeCharSeq) {
+            "//=" -> {
+                length = 3
+                return Tokens.SLASH_SLASH_EQ
+            }
 
-                "//=" -> {
-                    length = 3
-                    return Tokens.SLASH_SLASH_EQ
-                }
+            ">>=" -> {
+                length = 3
+                return Tokens.GTGT_EQ
+            }
 
-                ">>=" -> {
-                    length = 3
-                    return Tokens.GTGT_EQ
-                }
+            "<<=" -> {
+                length = 3
+                return Tokens.LTLT_EQ
+            }
 
-                "<<=" -> {
-                    length = 3
-                    return Tokens.LTLT_EQ
-                }
+            "<=>" -> {
+                length = 3
+                return Tokens.SPACESHIP
+            }
 
-                "<=>" -> {
-                    length = 3
-                    return Tokens.SPACESHIP
-                }
+            "..=" -> {
+                length = 3
+                return Tokens.DOT_DOT_EQ
+            }
 
-                "..=" -> {
-                    length = 3
-                    return Tokens.DOT_DOT_EQ
-                }
+            "??=" -> {
+                length = 3
+                return Tokens.NULL_COALESCING_EQ
+            }
 
-                "..<" -> {
-                    length = 3
-                    return Tokens.DOT_DOT_LT
-                }
+            "|?>" -> {
+                length = 3
+                return Tokens.SAFEPIPE
+            }
 
-                "?.." -> {
-                    length = 3
-                    return Tokens.QUESTION_DOT_DOT
-                }
-
-                "===" -> {
-                    length = 3
-                    return Tokens.EQEQEQ
-                }
-
-                "!==" -> {
-                    length = 3
-                    return Tokens.NEQEQ
-                }
-
-                "/**" -> {
-                    length = 3
-                    return Tokens.SLASH_STAR_STAR
-                }
-
-                "###" -> {
-                    length = 3
-                    return Tokens.HASH_HASH_HASH
-                }
+            "..." -> {
+                length = 3
+                return Tokens.DOT_DOT_DOT
             }
         }
+    }
 
-        // 处理两字符运算符
-        if (offset + 1 < bufferLen) {
-            val twoCharSeq = source.subSequence(offset, offset + 2).toString()
-            when (twoCharSeq) {
-                "->" -> {
-                    length = 2
-                    return Tokens.ARROW
-                }
 
-                "<-" -> {
-                    length = 2
-                    return Tokens.ARROW_LEFT
-                }
+    if (offset + 1 < bufferLen) {
+        val twoCharSeq = source.subSequence(offset, offset + 2).toString()
+        when (twoCharSeq) {
+            "->" -> {
+                length = 2
+                return Tokens.ARROW
+            }
 
-                "=>" -> {
-                    length = 2
-                    return Tokens.FAT_ARROW
-                }
+            "-=" -> {
+                length = 2
+                return Tokens.MINUS_EQ
+            }
 
-                "==" -> {
-                    length = 2
-                    return Tokens.EQEQ
-                }
+            "=>" -> {
+                length = 2
+                return Tokens.FAT_ARROW
+            }
 
-                "!=" -> {
-                    length = 2
-                    return Tokens.NEQ
-                }
+            "==" -> {
+                length = 2
+                return Tokens.EQEQ
+            }
 
-                "~=" -> {
-                    length = 2
-                    return Tokens.TILDE_EQ
-                }
+            "!=" -> {
+                length = 2
+                return Tokens.NEQ
+            }
 
-                "<=" -> {
-                    length = 2
-                    return Tokens.LEQ
-                }
+            "~=" -> {
+                length = 2
+                return Tokens.TILDE_EQ
+            }
 
-                ">=" -> {
-                    length = 2
-                    return Tokens.GEQ
-                }
+            "<=" -> {
+                length = 2
+                return Tokens.LEQ
+            }
 
-                "++" -> {
-                    length = 2
-                    return Tokens.PLUS_PLUS
-                }
+            "<<" -> {
+                length = 2
+                return Tokens.LTLT
+            }
 
-                "+=" -> {
-                    length = 2
-                    return Tokens.PLUS_EQ
-                }
+            "<|" -> {
+                length = 2
+                return Tokens.LT_BAR
+            }
 
-                "-=" -> {
-                    length = 2
-                    return Tokens.MINUS_EQ
-                }
+            ">=" -> {
+                length = 2
+                return Tokens.GEQ
+            }
 
-                "*=" -> {
-                    length = 2
-                    return Tokens.STAR_EQ
-                }
+            ">>" -> {
+                length = 2
+                return Tokens.GTGT
+            }
 
-                "/=" -> {
-                    length = 2
-                    return Tokens.SLASH_EQ
-                }
+            "++" -> {
+                length = 2
+                return Tokens.PLUS_PLUS
+            }
 
-                "%=" -> {
-                    length = 2
-                    return Tokens.PERCENT_EQ
-                }
+            "+=" -> {
+                length = 2
+                return Tokens.PLUS_EQ
+            }
 
-                "&=" -> {
-                    length = 2
-                    return Tokens.AMP_EQ
-                }
+            "*=" -> {
+                length = 2
+                return Tokens.STAR_EQ
+            }
 
-                "|=" -> {
-                    length = 2
-                    return Tokens.BAR_EQ
-                }
+            "/=" -> {
+                length = 2
+                return Tokens.SLASH_EQ
+            }
 
-                "^=" -> {
-                    length = 2
-                    return Tokens.CARET_EQ
-                }
+            "//" -> {
+                length = 2
+                return Tokens.SLASH_SLASH
+            }
 
-                "=<" -> {
-                    length = 2
-                    return Tokens.EQ_LT
-                }
+            "%=" -> {
+                length = 2
+                return Tokens.PERCENT_EQ
+            }
 
-                "::" -> {
-                    length = 2
-                    return Tokens.COLON_COLON
-                }
+            "&=" -> {
+                length = 2
+                return Tokens.AMP_EQ
+            }
 
-                ".." -> {
-                    var dotCount = 2
-                    while (offset + dotCount < bufferLen &&
-                        charAt(offset + dotCount) == '.'
-                    ) {
-                        dotCount++
-                    }
-                    length = dotCount
-                    return Tokens.DOT_DOT
-                }
+            "|=" -> {
+                length = 2
+                return Tokens.BAR_EQ
+            }
 
-                "//" -> {
-                    length = 2
-                    return Tokens.SLASH_SLASH
-                }
+            "|>" -> {
+                length = 2
+                return Tokens.BAR_GT
+            }
 
-                "\\\\" -> {
-                    length = 2
-                    return Tokens.BACKSLASH_BACKSLASH
-                }
+            "^=" -> {
+                length = 2
+                return Tokens.CARET_EQ
+            }
 
-                "/*" -> {
-                    length = 2
-                    return Tokens.SLASH_STAR
-                }
+            "::" -> {
+                length = 2
+                return Tokens.COLON_COLON
+            }
 
-                "*/" -> {
-                    length = 2
-                    return Tokens.STAR_SLASH
-                }
+            ":=" -> {
+                length = 2
+                return Tokens.COLON_EQ
+            }
 
-                "~~" -> {
-                    length = 2
-                    return Tokens.TILDE_TILDE
+            ".." -> {
+                var dotCount = 2
+                while (offset + dotCount < bufferLen && charAt(offset + dotCount) == '.') {
+                    dotCount++
                 }
+                length = dotCount
+                return Tokens.DOT_DOT
+            }
 
-                "^^" -> {
-                    length = 2
-                    return Tokens.CARET_CARET
-                }
+            "$$" -> {
+                length = 2
+                return Tokens.DOLLAR_DOLLAR
+            }
 
-                "##" -> {
-                    length = 2
-                    return Tokens.HASH_HASH
-                }
+            "?." -> {
+                length = 2
+                return Tokens.QUESTION_DOT
+            }
 
-                "$$" -> {
-                    length = 2
-                    return Tokens.DOLLAR_DOLLAR
-                }
-
-                "@@" -> {
-                    length = 2
-                    return Tokens.AT_AT
-                }
-
-                ":=" -> {
-                    length = 2
-                    return Tokens.COLON_EQ
-                }
-
-                "=:" -> {
-                    length = 2
-                    return Tokens.EQ_COLON
-                }
-
-                "?." -> {
-                    length = 2
-                    return Tokens.QUESTION_DOT
-                }
-
-                "?:" -> {
-                    length = 2
-                    return Tokens.QUESTION_COLON
-                }
-
-                "?=" -> {
-                    length = 2
-                    return Tokens.QUESTION_EQ
-                }
-
-                "?-" -> {
-                    length = 2
-                    return Tokens.QUESTION_MINUS
-                }
-
-                "?+" -> {
-                    length = 2
-                    return Tokens.QUESTION_PLUS
-                }
-
-                "!!" -> {
-                    length = 2
-                    return Tokens.NOT_NOT
-                }
-
-                "??" -> {
-                    length = 2
-                    return Tokens.NULL_COALESCING
-                }
-
-                "**" -> {
-                    length = 2
-                    return Tokens.STAR_STAR
-                }
-
-                "-|" -> {
-                    length = 2
-                    return Tokens.MINUS_BAR
-                }
-
-                "|>" -> {
-                    length = 2
-                    return Tokens.BAR_GT
-                }
-
-                "<|" -> {
-                    length = 2
-                    return Tokens.LT_BAR
-                }
-
-                ">>" -> {
-                    length = 2
-                    return Tokens.GTGT
-                }
-
-                "<<" -> {
-                    length = 2
-                    return Tokens.LTLT
-                }
+            "??" -> {
+                length = 2
+                return Tokens.NULL_COALESCING
             }
         }
+    }
 
         if (isPrimeDigit(ch2)) {
             return scanNumber()
@@ -717,9 +627,9 @@ class LuaTextTokenizer {
         }
     }
     return true
-}
+    }
 
-
+    
     protected fun scanNewline() {
         if (offset + length < bufferLen && charAt(offset + length) == '\n') {
             length++
@@ -887,7 +797,7 @@ class LuaTextTokenizer {
 
     // 到文件末尾仍未闭合
     return Tokens.STRING
-}
+    }
     protected fun scanNumber(): Tokens {
     // 检测十六进制前缀 0x 或 0X，返回 HEX_COLOR
     if (offset + 1 < bufferLen && source[offset] == '0' &&
@@ -963,7 +873,7 @@ class LuaTextTokenizer {
 
         else -> Tokens.NUMBER
     }
-}
+    }
 
     protected fun scanDIV(): Tokens {
         if (offset + 1 >= bufferLen) {

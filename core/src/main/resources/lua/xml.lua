@@ -1,4 +1,3 @@
-
 local base = _G
 
 local xml = require("xml.core")
@@ -10,7 +9,7 @@ TAG = 0
 -- sets or returns tag of a LuaXML object
 function tag(var,tag)
   if base.type(var)~="table" then return end
-  if base.type(tag)=="nil" then 
+  if base.type(tag)=="nil" then
     return var[TAG]
   end
   var[TAG] = tag
@@ -18,9 +17,9 @@ end
 
 -- creates a new LuaXML object either by setting the metatable of an existing Lua table or by setting its tag
 function new(arg)
-  if base.type(arg)=="table" then 
+  if base.type(arg)=="table" then
     base.setmetatable(arg,{__index=xml, __tostring=xml.str})
-	return arg
+    return arg
   end
   local var={}
   base.setmetatable(var,{__index=xml, __tostring=xml.str})
@@ -43,41 +42,40 @@ function str(var,indent,tagValue)
   local indentStr=""
   for i = 1,indent do indentStr=indentStr.."  " end
   local tableStr=""
-  
+
   if base.type(var)=="table" then
     local tag = var[0] or tagValue or base.type(var)
     local s = indentStr.."<"..tag
-    for k,v in base.pairs(var) do -- attributes 
+    for k,v in base.pairs(var) do -- attributes
       if base.type(k)=="string" then
         if base.type(v)=="table" and k~="_M" then --  otherwise recursiveness imminent
           tableStr = tableStr..str(v,indent+1,k)
-        else
+         else
           s = s.." "..k.."=\""..encode(base.tostring(v)).."\""
         end
       end
     end
     if #var==0 and #tableStr==0 then
       s = s.." />\n"
-    elseif #var==1 and base.type(var[1])~="table" and #tableStr==0 then -- single element
+     elseif #var==1 and base.type(var[1])~="table" and #tableStr==0 then -- single element
       s = s..">"..encode(base.tostring(var[1])).."</"..tag..">\n"
-    else
+     else
       s = s..">\n"
       for k,v in base.ipairs(var) do -- elements
         if base.type(v)=="string" then
           s = s..indentStr.."  "..encode(v).." \n"
-        else
+         else
           s = s..str(v,indent+1)
         end
       end
       s=s..tableStr..indentStr.."</"..tag..">\n"
     end
     return s
-  else
+   else
     local tag = base.type(var)
     return indentStr.."<"..tag.."> "..encode(base.tostring(var)).." </"..tag..">\n"
   end
 end
-
 
 -- saves a Lua var as xml file
 function save(var,filename)
@@ -88,7 +86,6 @@ function save(var,filename)
   file:write(str(var))
   base.io.close(file)
 end
-
 
 -- recursively parses a Lua table for a substatement fitting to the provided tag and attribute
 function find(var, tag, attributeKey,attributeValue)
@@ -103,7 +100,7 @@ function find(var, tag, attributeKey,attributeValue)
       base.setmetatable(var,{__index=xml, __tostring=xml.str})
       return var
     end
-  else
+   else
     if attributeValue == nil or var[attributeKey]==attributeValue then
       base.setmetatable(var,{__index=xml, __tostring=xml.str})
       return var
@@ -117,4 +114,5 @@ function find(var, tag, attributeKey,attributeValue)
     end
   end
 end
+
 return xml

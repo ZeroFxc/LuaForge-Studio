@@ -14,11 +14,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,6 +46,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.androlua.LuaActivity
@@ -114,8 +118,10 @@ fun CodeEditScreen(
     var apkFilePath by remember { mutableStateOf<String?>(null) }
     var isBuilding by remember { mutableStateOf(false) }
     var isCompilingFile by remember { mutableStateOf(false) }
-    var showInitialLoader by remember { mutableStateOf(!viewModel.hasShownInitialLoader) }
+    var showInitialLoader by remember { mutableStateOf(true) }
+    var showEditorContent by remember { mutableStateOf(false) }
     var tabBarRendered by remember { mutableStateOf(false) }
+    var loadingStatusText by remember { mutableStateOf("正在准备...") }
     val lastFileToOpen = remember { mutableStateOf<String?>(null) }
 
     var currentOverlay by remember { mutableStateOf<OverlayScreen>(OverlayScreen.NONE) }
@@ -243,14 +249,18 @@ fun CodeEditScreen(
     LaunchedEffect(projectPath, project.createdDate.time) {
         if (previousProjectPath != projectPath || previousProjectTimestamp != project.createdDate.time) {
             showInitialLoader = true
+            showEditorContent = false
             tabBarRendered = false
+            loadingStatusText = "正在准备..."
             previousProjectPath = projectPath
             previousProjectTimestamp = project.createdDate.time
 
             if (!viewModel.isInitialized) {
+                loadingStatusText = "正在初始化..."
                 viewModel.initialize(context)
             }
 
+            loadingStatusText = "正在加载文件..."
             loadProjectFiles(
                 viewModel = viewModel,
                 projectPath = projectPath,
@@ -259,7 +269,9 @@ fun CodeEditScreen(
                 lastFileToOpen = lastFileToOpen
             )
 
+            showEditorContent = true
             showInitialLoader = false
+            loadingStatusText = "正在准备..."
             viewModel.onInitialLoaderShown()
         }
     }
@@ -630,6 +642,7 @@ fun CodeEditScreen(
                                         EditorContent(
                                             modifier = Modifier.fillMaxSize(),
                                             showInitialLoader = showInitialLoader,
+                                            showEditorContent = showEditorContent,
                                             isBuilding = isBuilding,
                                             isAutoSaving = isAutoSaving,
                                             isCompilingFile = isCompilingFile,
@@ -661,7 +674,9 @@ fun CodeEditScreen(
                                                     SwipeDirection.UP -> false
                                                     SwipeDirection.DOWN -> true
                                                 }
-                                            }
+                                            },
+                                            projectName = project.name,
+                                            loadingStatusText = loadingStatusText
                                         )
                                     }
                                 }
@@ -898,6 +913,7 @@ fun ProjectFileTree(
 fun EditorContent(
     modifier: Modifier = Modifier,
     showInitialLoader: Boolean,
+    showEditorContent: Boolean,
     isBuilding: Boolean,
     isAutoSaving: Boolean,
     isCompilingFile: Boolean,
@@ -923,102 +939,200 @@ fun EditorContent(
     toast: NonBlockingToastState,
     quickActionScrollState: ScrollState,
     symbolBarScrollState: ScrollState,
-    // 新增参数
     quickBarVisible: Boolean,
-    onSwipe: (SwipeDirection) -> Unit
+    onSwipe: (SwipeDirection) -> Unit,
+    projectName: String = "",
+    loadingStatusText: String = ""
 ) {
     val scope = rememberCoroutineScope()
     val hasOpenFiles = viewModel.openFiles.isNotEmpty()
     val isCompletionLoading by remember { derivedStateOf { viewModel.isCompletionDataLoading } }
     val completionProgress by remember { derivedStateOf { viewModel.completionDataProgress } }
 
-    Column(modifier = modifier) {
-        val showProgressBar =
-            showInitialLoader || isBuilding || isAutoSaving || isCompilingFile || isCompletionLoading || isBackingUp
-        AnimatedVisibility(visible = showProgressBar) {
-            // 始终显示不确定进度条（无限循环）
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth(),
-                strokeCap = StrokeCap.Butt
-            )
-        }
-
+    Box(modifier = modifier) {
         AnimatedVisibility(
-            visible = hasOpenFiles && quickBarVisible,
-            enter = fadeIn() + expandVertically(
-                expandFrom = Alignment.Top,
-                animationSpec = tween(300)
-            ),
-            exit = fadeOut() + shrinkVertically(
-                shrinkTowards = Alignment.Top,
-                animationSpec = tween(200)
-            )
+            visible = showEditorContent,
+            enter = fadeIn(tween(500))
         ) {
-            QuickActionToolbar(
-                actions = quickActions,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(38.dp),
-                scrollState = quickActionScrollState
-            )
-        }
-
-        // 搜索面板
-        AnimatedVisibility(visible = isSearchVisible) {
-            SearchPanel(
-                searchText = searchText,
-                onSearchTextChange = onSearchTextChange,
-                replaceText = replaceText,
-                onReplaceTextChange = onReplaceTextChange,
-                ignoreCase = ignoreCase,
-                onIgnoreCaseChange = onIgnoreCaseChange,
-                onClose = onCloseSearch,
-                onSearchNext = onSearchNext,
-                onSearchPrev = onSearchPrev,
-                onReplaceCurrent = { text -> onReplaceCurrent(text) },
-                onReplaceAll = { text -> onReplaceAll(text) }
-            )
-        }
-
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
-            LocalDensity.current
-            val availableHeight =
-                remember(constraints.maxHeight) { constraints.maxHeight.toFloat() }
-            LaunchedEffect(availableHeight) {
-                if (availableHeight > 0) panelState.updateMaxHeight(
-                    availableHeight
-                )
+            val staggeredStart = remember { mutableStateOf(0) }
+            LaunchedEffect(Unit) {
+                staggeredStart.value = 1
             }
 
             Column(Modifier.fillMaxSize()) {
-                Box(
-                    Modifier
+                val showProgressBar =
+                    isBuilding || isAutoSaving || isCompilingFile || isCompletionLoading || isBackingUp
+
+                AnimatedVisibility(
+                    visible = showProgressBar && staggeredStart.value >= 1,
+                    enter = fadeIn(tween(250)) + expandVertically(animationSpec = tween(250))
+                ) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        strokeCap = StrokeCap.Butt
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = hasOpenFiles && quickBarVisible && staggeredStart.value >= 1,
+                    enter = fadeIn(tween(300, delayMillis = 100)) + expandVertically(
+                        expandFrom = Alignment.Top,
+                        animationSpec = tween(300, delayMillis = 100)
+                    ),
+                    exit = fadeOut() + shrinkVertically(
+                        shrinkTowards = Alignment.Top,
+                        animationSpec = tween(200)
+                    )
+                ) {
+                    QuickActionToolbar(
+                        actions = quickActions,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(38.dp),
+                        scrollState = quickActionScrollState
+                    )
+                }
+
+                AnimatedVisibility(visible = isSearchVisible) {
+                    SearchPanel(
+                        searchText = searchText,
+                        onSearchTextChange = onSearchTextChange,
+                        replaceText = replaceText,
+                        onReplaceTextChange = onReplaceTextChange,
+                        ignoreCase = ignoreCase,
+                        onIgnoreCaseChange = onIgnoreCaseChange,
+                        onClose = onCloseSearch,
+                        onSearchNext = onSearchNext,
+                        onSearchPrev = onSearchPrev,
+                        onReplaceCurrent = { text -> onReplaceCurrent(text) },
+                        onReplaceAll = { text -> onReplaceAll(text) }
+                    )
+                }
+
+                BoxWithConstraints(
+                    modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                 ) {
-                    FileTabView(
-                        viewModel = viewModel,
-                        lastFileToOpen = lastFileToOpen,
-                        onTabBarRendered = onTabBarRendered,
-                        panelState = panelState,
-                        onOpenFileTree = {
-                            scope.launch { if (fileTreeDrawerState.isClosed) fileTreeDrawerState.open() }
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                        onSwipe = onSwipe // 传递滑动手势回调
+                    LocalDensity.current
+                    val availableHeight =
+                        remember(constraints.maxHeight) { constraints.maxHeight.toFloat() }
+                    LaunchedEffect(availableHeight) {
+                        if (availableHeight > 0) panelState.updateMaxHeight(
+                            availableHeight
+                        )
+                    }
+
+                    Column(Modifier.fillMaxSize()) {
+                        AnimatedVisibility(
+                            visible = staggeredStart.value >= 1,
+                            enter = fadeIn(tween(400, delayMillis = 200)) + slideInVertically(
+                                initialOffsetY = { it / 4 },
+                                animationSpec = tween(400, delayMillis = 200)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            FileTabView(
+                                viewModel = viewModel,
+                                lastFileToOpen = lastFileToOpen,
+                                onTabBarRendered = onTabBarRendered,
+                                panelState = panelState,
+                                onOpenFileTree = {
+                                    scope.launch { if (fileTreeDrawerState.isClosed) fileTreeDrawerState.open() }
+                                },
+                                modifier = Modifier.fillMaxSize(),
+                                onSwipe = onSwipe
+                            )
+                        }
+
+                        AnimatedVisibility(
+                            visible = hasOpenFiles && staggeredStart.value >= 1,
+                            enter = fadeIn(tween(350, delayMillis = 350)) + slideInVertically(
+                                initialOffsetY = { it / 2 },
+                                animationSpec = tween(350, delayMillis = 350)
+                            )
+                        ) {
+                            DraggableSymbolPanel(
+                                viewModel = viewModel,
+                                panelState = panelState,
+                                hasOpenFiles = hasOpenFiles,
+                                toast = toast,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = showInitialLoader,
+            exit = fadeOut(tween(500))
+        ) {
+            ProjectLoadingOverlay(
+                projectName = projectName,
+                loadingStatusText = loadingStatusText,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+@Composable
+fun ProjectLoadingOverlay(
+    projectName: String,
+    loadingStatusText: String = "",
+    modifier: Modifier = Modifier
+) {
+    val alpha = remember { Animatable(0.3f) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            alpha.animateTo(1f, animationSpec = tween(1000, easing = LinearEasing))
+            alpha.animateTo(0.3f, animationSpec = tween(1000, easing = LinearEasing))
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(28.dp)
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(64.dp),
+                strokeWidth = 5.dp,
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            )
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = projectName,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Text(
+                    text = stringResource(R.string.code_editor_loading_project),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha.value)
+                )
+
+                if (loadingStatusText.isNotEmpty()) {
+                    Text(
+                        text = loadingStatusText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = alpha.value)
                     )
                 }
-                DraggableSymbolPanel(
-                    viewModel = viewModel,
-                    panelState = panelState,
-                    hasOpenFiles = hasOpenFiles,
-                    toast = toast,
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
         }
     }

@@ -64,8 +64,13 @@ class SplashWelcome : ComponentActivity() {
         val executor = Executors.newSingleThreadExecutor()
         val handler = Handler(Looper.getMainLooper())
         executor.execute {
-            onUpdate()
-            handler.post { startActivity() }
+            try {
+                onUpdate()
+            } catch (e: Throwable) {
+                Log.e("SplashWelcome", "onUpdate failed", e)
+            } finally {
+                handler.post { startActivity() }
+            }
         }
         executor.shutdown()
     }
@@ -128,28 +133,32 @@ class SplashWelcome : ComponentActivity() {
     }
 
     private fun onUpdate() {
-        val L = LuaStateFactory.newLuaState()
-        L.openLibs()
         try {
-            if (L.LloadBuffer(LuaUtil.readAsset(this, "update.lua"), "update") == 0) {
-                if (L.pcall(0, 0, 0) == 0) {
-                    (L.getFunction("onUpdate") as? LuaFunction)?.call(mVersionName, mOldVersionName)
+            val L = LuaStateFactory.newLuaState()
+            L.openLibs()
+            try {
+                if (L.LloadBuffer(LuaUtil.readAsset(this, "update.lua"), "update") == 0) {
+                    if (L.pcall(0, 0, 0) == 0) {
+                        (L.getFunction("onUpdate") as? LuaFunction)?.call(mVersionName, mOldVersionName)
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e("SplashWelcome", "update.lua execution failed", e)
             }
-        } catch (e: Exception) {
-            sendMsg()
+        } catch (e: Throwable) {
+            Log.e("SplashWelcome", "Lua engine init failed", e)
         }
 
         try {
             unApk("assets", localDir)
             unApk("lua", luaMdDir)
         } catch (e: IOException) {
-            sendMsg()
+            Log.e("SplashWelcome", "unApk failed", e)
         }
     }
 
-    private fun sendMsg() {
-        // TODO: Implement this method
+    private fun sendMsg(msg: String = "") {
+        Log.e("SplashWelcome", msg)
     }
 
     @Throws(IOException::class)
@@ -189,9 +198,12 @@ class SplashWelcome : ComponentActivity() {
 
         threadPool.shutdown()
         try {
-            threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS)
+            threadPool.awaitTermination(60, TimeUnit.SECONDS)
         } catch (e: InterruptedException) {
             Log.e("SplashWelcome", "ExecutorService interrupted: ${e.message}")
+            Thread.currentThread().interrupt()
+        } finally {
+            threadPool.shutdownNow()
         }
         zipFile?.close()
     }

@@ -111,6 +111,55 @@ enum class Tokens {
     WHEN,
     HEX_COLOR, // 新增：十六进制颜色
 
+    // 通用关键字
+    ASM,              // asm
+    COMMAND,          // command
+    CONST,            // const
+    ENUM,             // enum
+    GLOBAL,           // global
+    AS,               // as
+    IS,               // is
+    INSTANCEOF,       // instanceof
+    LET,              // let
+    TAKE,             // take
+    MATCH,            // match
+    WITH,             // with
+    EXPORT,           // export
+    DOLLAR,           // $
+    KEYWORD_KW,       // keyword
+    OPERATOR_KW,      // operator
+
+    // OOP 关键字
+    ABSTRACT,         // abstract
+    CLASS,            // class
+    EXTENDS,          // extends
+    FINAL,            // final
+    IMPLEMENTS,       // implements
+    INTERFACE,        // interface
+    NEW,              // new
+    SUPER,            // super
+    PRIVATE,          // private
+    PROTECTED,        // protected
+    PUBLIC,           // public
+    STATIC,           // static
+    ASYNC,            // async
+    AWAIT,            // await
+    STRUCT,           // struct
+    SUPERSTRUCT,      // superstruct
+    CONCEPT,          // concept
+    NAMESPACE,        // namespace
+    USING,            // using
+    REQUIRES,         // requires
+
+    // 类型关键字
+    BOOL,             // bool
+    CHAR,             // char
+    DOUBLE,           // double
+    FLOAT,            // float
+    TYPE_INT,         // int
+    LONG,             // long
+    VOID,             // void
+
     // 三字符运算符
     ARROW_LEFT_LONG,      // <--
     ARROW_RIGHT_LONG,     // -->
@@ -125,6 +174,9 @@ enum class Tokens {
     SLASH_SLASH_EQ,       // //=
     GTGT_EQ,              // >>=
     LTLT_EQ,              // <<=
+    NULL_COALESCING_EQ,   // ??=
+    SAFEPIPE,             // |?>
+    DOT_DOT_DOT,          // ...
 
     // 两字符运算符
     NOT_NOT,              // !!

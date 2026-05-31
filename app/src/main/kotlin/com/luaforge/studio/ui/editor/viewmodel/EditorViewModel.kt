@@ -51,21 +51,28 @@ data class CodeEditorState(
     val file: File,
     val languageType: String,
 ) {
-    var content by mutableStateOf("")
-    var savedContent by mutableStateOf("")
-    val isModified: Boolean get() = content != savedContent
+    var content = ""
+    var savedContent = ""
+    var isModified by mutableStateOf(false)
     var contentHash by mutableStateOf("")
         private set
 
     fun onContentLoaded(loadedContent: String) {
         content = loadedContent
         savedContent = loadedContent
+        isModified = false
         updateContentHash()
     }
 
     fun onContentSaved() {
         savedContent = content
+        isModified = false
         updateContentHash()
+    }
+
+    fun onContentChanged(newContent: String) {
+        content = newContent
+        isModified = content != savedContent
     }
 
     fun updateContentHash() {
@@ -339,14 +346,16 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
         SettingsManager.addListener { newSettings ->
             val fontChanged = newSettings.editorFontType != currentEditorFontType ||
                     newSettings.customFontPath != currentCustomFontPath
+            val activeEditor = openFiles.getOrNull(activeFileIndex)?.file?.absolutePath
+                ?.let { editorInstances[it] }
             if (fontChanged) {
-                updateEditorFonts()
+                updateEditorFonts(activeEditor)
                 currentEditorFontType = newSettings.editorFontType
                 currentCustomFontPath = newSettings.customFontPath
             }
             val indentGuideChanged = newSettings.indentGuideEnabled != currentIndentGuideEnabled
             if (indentGuideChanged) {
-                updateEditorIndentGuides()
+                updateEditorIndentGuides(activeEditor)
                 currentIndentGuideEnabled = newSettings.indentGuideEnabled
             }
             val newSyntaxColors = mapOf(
@@ -360,11 +369,11 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
             )
             if (newSyntaxColors != currentSyntaxColors) {
                 currentSyntaxColors = newSyntaxColors
-                updateEditorSyntaxColors(newSettings)
+                updateEditorSyntaxColors(newSettings, activeEditor)
             }
-            editorInstances.values.forEach { editor ->
+            activeEditor?.let { editor ->
                 (editor.editorLanguage as? LuaLanguage)?.setCompletionCaseSensitive(newSettings.completionCaseSensitive)
-                ?.setHighlightHexColorsEnabled(SettingsManager.currentSettings.hexColorHighlightEnabled)
+                    ?.setHighlightHexColorsEnabled(SettingsManager.currentSettings.hexColorHighlightEnabled)
             }
         }
 
@@ -413,12 +422,13 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
     }
 
     // 编辑器外观更新
-    fun updateEditorIndentGuides() {
+    fun updateEditorIndentGuides(editor: io.github.rosemoe.sora.widget.CodeEditor? = null) {
         val settings = SettingsManager.currentSettings
         val baseFlags = 0
-        editorInstances.values.forEach { editor ->
-            editor.nonPrintablePaintingFlags = if (settings.indentGuideEnabled) 81 else baseFlags
-            editor.postInvalidate()
+        val editors = if (editor != null) listOf(editor) else editorInstances.values.toList()
+        editors.forEach { ed ->
+            ed.nonPrintablePaintingFlags = if (settings.indentGuideEnabled) 81 else baseFlags
+            ed.postInvalidate()
         }
     }
 
@@ -441,14 +451,12 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                 editor.requestFocus()
                 val validOffset = selectionOffset.coerceIn(0, symbol.length)
                 editor.insertText(symbol, validOffset)
-                val newText = editor.text.toString()
-                if (state.content != newText) state.content = newText
+                state.onContentChanged(editor.text.toString())
             } else {
                 val newEditor = getOrCreateEditor(appContext, state)
                 newEditor.requestFocus()
                 newEditor.insertText(symbol, selectionOffset.coerceIn(0, symbol.length))
-                val newText = newEditor.text.toString()
-                if (state.content != newText) state.content = newText
+                state.onContentChanged(newEditor.text.toString())
             }
         }
     }
@@ -542,12 +550,14 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
     fun updateEditorTheme(
         seedColor: Color, isDark: Boolean,
         primaryColor: Int, backgroundColor: Int, onBackgroundColor: Int,
-        outlineColor: Int, surfaceColor: Int, onSurfaceColor: Int
+        outlineColor: Int, surfaceColor: Int, onSurfaceColor: Int,
+        editor: io.github.rosemoe.sora.widget.CodeEditor? = null
     ) {
         val settings = SettingsManager.currentSettings
-        editorInstances.values.forEach { editor ->
+        val editors = if (editor != null) listOf(editor) else editorInstances.values.toList()
+        editors.forEach { ed ->
             EditorColorSchemeManager.applyNonComposableThemeColors(
-                scheme = editor.colorScheme,
+                scheme = ed.colorScheme,
                 seedColor = seedColor,
                 isDark = isDark,
                 primaryColor = primaryColor,
@@ -564,13 +574,17 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                 commentColor = settings.commentColor.toArgb(),
                 selectedLineColor = settings.selectedLineColor.toArgb()
             )
-            editor.postInvalidate()
+            ed.postInvalidate()
         }
     }
 
-    fun updateEditorSyntaxColors(settings: com.luaforge.studio.ui.settings.SettingsData) {
-        editorInstances.values.forEach { editor ->
-            val scheme = editor.colorScheme
+    fun updateEditorSyntaxColors(
+        settings: com.luaforge.studio.ui.settings.SettingsData,
+        editor: io.github.rosemoe.sora.widget.CodeEditor? = null
+    ) {
+        val editors = if (editor != null) listOf(editor) else editorInstances.values.toList()
+        editors.forEach { ed ->
+            val scheme = ed.colorScheme
             scheme.setColor(EditorColorScheme.CLASS_NAME, settings.classNameColor.toArgb())
             scheme.setColor(EditorColorScheme.LOCAL_VARIABLE, settings.localVariableColor.toArgb())
             scheme.setColor(EditorColorScheme.KEYWORD, settings.keywordColor.toArgb())
@@ -581,17 +595,18 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                 EditorColorScheme.SELECTED_TEXT_BACKGROUND,
                 settings.selectedLineColor.toArgb()
             )
-            editor.postInvalidate()
+            ed.postInvalidate()
         }
     }
 
-    fun updateEditorFonts() {
-        editorInstances.values.forEach { editor ->
+    fun updateEditorFonts(editor: io.github.rosemoe.sora.widget.CodeEditor? = null) {
+        val editors = if (editor != null) listOf(editor) else editorInstances.values.toList()
+        editors.forEach { ed ->
             FontManager.getEditorTypeface(appContext, SettingsManager.currentSettings)
                 ?.let { typeface ->
-                    editor.setTypefaceText(typeface)
-                    editor.setTypefaceLineNumber(typeface)
-                    editor.getComponent(EditorAutoCompletion::class.java).setEnabledAnimation(true)
+                    ed.setTypefaceText(typeface)
+                    ed.setTypefaceLineNumber(typeface)
+                    ed.getComponent(EditorAutoCompletion::class.java).setEnabledAnimation(true)
                 }
         }
     }
@@ -629,14 +644,6 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                 openFiles[activeFileIndex].file.absolutePath == filePath
 
         editorInstances[filePath]?.let { existingEditor ->
-            existingEditor.post {
-                val currentText = existingEditor.text.toString()
-                if (currentText != state.content) {
-                    existingEditor.setText(state.content)
-                    LogCatcher.d("EditorViewModel", "缓存编辑器内容不同步，已修正: $filePath")
-                }
-                if (isActiveEditor) existingEditor.requestFocus() else existingEditor.clearFocus()
-            }
             (existingEditor.parent as? ViewGroup)?.removeView(existingEditor)
             return existingEditor
         }
@@ -740,8 +747,7 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                     endColumn: Int,
                     inserted: CharSequence
                 ) {
-                    val newText = content.toString()
-                    if (state.content != newText) state.content = newText
+                    state.onContentChanged(content.toString())
                 }
 
                 override fun afterDelete(
@@ -752,8 +758,7 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                     endColumn: Int,
                     deleted: CharSequence
                 ) {
-                    val newText = content.toString()
-                    if (state.content != newText) state.content = newText
+                    state.onContentChanged(content.toString())
                 }
             })
         }

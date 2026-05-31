@@ -144,6 +144,10 @@ public class LuaState {
         javaObjectMap.clear();
     }
 
+    public boolean isClosed() {
+        return luaState == 0;
+    }
+
     @Override
     protected void finalize() {
         Log.i("luaState", "finalize: " + luaState);
@@ -152,13 +156,6 @@ public class LuaState {
         } catch (Exception e) {
             System.err.println("Unable to release luaState " + luaState);
         }
-    }
-
-    /**
-     * Returns <code>true</code> if state is closed.
-     */
-    public synchronized boolean isClosed() {
-        return luaState == 0;
     }
 
     /**

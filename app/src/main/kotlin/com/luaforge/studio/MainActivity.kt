@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -161,13 +162,12 @@ fun MainApp() {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        AnimatedContent(
+        Crossfade(
             targetState = currentScreen,
-            transitionSpec = {
-                val isForward = targetState != AppScreen.MAIN
-                TransitionUtil.createScreenTransition(isForward)
-            },
-            label = "screen_transition"
+            animationSpec = tween(
+                durationMillis = 450,
+                easing = TransitionUtil.decelerateEasing
+            )
         ) { targetScreen ->
             Box(
                 modifier = Modifier
@@ -374,9 +374,13 @@ fun MainScreen(
     // 新增状态：待删除的项目ID集合（用于退出动画）
     var pendingDeletionIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val lazyListState = rememberLazyListState()
     var showExtendedFab by remember { mutableStateOf(true) }
+
+    var isRefreshing by remember { mutableStateOf(false) }
+    var visibleCount by remember { mutableIntStateOf(0) }
+    var refreshTrigger by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(
         lazyListState.firstVisibleItemIndex,
@@ -385,6 +389,17 @@ fun MainScreen(
         val isScrolled = lazyListState.firstVisibleItemIndex > 0 ||
                 lazyListState.firstVisibleItemScrollOffset > 0
         showExtendedFab = !isScrolled
+    }
+
+    LaunchedEffect(refreshTrigger, displayedProjects.size) {
+        visibleCount = 0
+        if (displayedProjects.isNotEmpty()) {
+            delay(100)
+            for (i in 1..displayedProjects.size) {
+                visibleCount = i
+                delay(50)
+            }
+        }
     }
 
     val pageOrder =
@@ -980,31 +995,55 @@ fun MainScreen(
                                     )
                                 }
                             } else {
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    state = lazyListState,
-                                    contentPadding = PaddingValues(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                PullToRefreshBox(
+                                    isRefreshing = isRefreshing,
+                                    onRefresh = {
+                                        scope.launch {
+                                            isRefreshing = true
+                                            val previousItems = projectItems.toList()
+                                            val previousSize = previousItems.size
+                                            ProjectUtil.loadProjectsFromDirectory(
+                                                projectsPath,
+                                                onProjectItemsChanged
+                                            )
+                                            val newItems = projectItems
+                                            val sizeChanged = newItems.size != previousSize
+                                            val contentChanged = newItems != previousItems
+                                            if (sizeChanged || contentChanged) {
+                                                refreshTrigger++
+                                            }
+                                            isRefreshing = false
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxSize()
                                 ) {
-                                    items(
-                                        items = displayedProjects,
-                                        key = { it.id } // 使用唯一ID作为key，确保动画正确
-                                    ) { project ->
-                                        ProjectCard(
-                                            project = project,
-                                            isPinned = project.id in pinnedSet,
-                                            isPendingDeletion = project.id in pendingDeletionIds, // 传递待删除状态
-                                            onTogglePinned = { togglePinned(project.id) },
-                                            onDeleteClick = {
-                                                deleteProjectId = project.id
-                                                deleteProjectName = project.name
-                                                deleteProjectPath = project.path
-                                                showDeleteDialog = true
-                                            },
-                                            onShareClick = { shareProject(project) },
-                                            onClick = { onNavigateToEditor(project) },
-                                            modifier = Modifier.animateItem() // 排序时的移动动画
-                                        )
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        state = lazyListState,
+                                        contentPadding = PaddingValues(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        items(
+                                            count = visibleCount.coerceAtMost(displayedProjects.size),
+                                            key = { displayedProjects[it].id }
+                                        ) { index ->
+                                            val project = displayedProjects[index]
+                                            ProjectCard(
+                                                project = project,
+                                                isPinned = project.id in pinnedSet,
+                                                isPendingDeletion = project.id in pendingDeletionIds,
+                                                onTogglePinned = { togglePinned(project.id) },
+                                                onDeleteClick = {
+                                                    deleteProjectId = project.id
+                                                    deleteProjectName = project.name
+                                                    deleteProjectPath = project.path
+                                                    showDeleteDialog = true
+                                                },
+                                                onShareClick = { shareProject(project) },
+                                                onClick = { onNavigateToEditor(project) },
+                                                modifier = Modifier.animateItem()
+                                            )
+                                        }
                                     }
                                 }
                             }

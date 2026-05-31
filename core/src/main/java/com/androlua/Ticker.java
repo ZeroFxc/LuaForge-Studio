@@ -3,7 +3,7 @@ package com.androlua;
 import android.os.Handler;
 import android.os.Message;
 
-public class Ticker {
+public class Ticker implements LuaGcable {
     private Handler mHandler;
 
     private Ticker.OnTickListener mOnTickListener;
@@ -20,6 +20,8 @@ public class Ticker {
 
     private long mOffset;
 
+    private boolean mGc = false;
+
 
     public Ticker() {
         init();
@@ -28,26 +30,37 @@ public class Ticker {
     private void init() {
         mHandler = new Handler() {
             public void handleMessage(Message msg) {
-                if (mOnTickListener != null)
-                    mOnTickListener.onTick();
+                if (mOnTickListener != null && !mGc) {
+                    try {
+                        mOnTickListener.onTick();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        mGc = true;
+                        isRun = false;
+                        mOnTickListener = null;
+                    }
+                }
             }
         };
         mThread = new Thread() {
             @Override
             public void run() {
                 isRun = true;
-                while (isRun) {
+                while (isRun && !mGc && mHandler != null) {
                     long now = System.currentTimeMillis();
                     if (!mEnabled)
                         mLast = now - mOffset;
                     if (now - mLast >= mPeriod) {
                         mLast = now;
-                        mHandler.sendEmptyMessage(0);
+                        if (mHandler != null) {
+                            mHandler.sendEmptyMessage(0);
+                        }
                     }
 
                     try {
                         sleep(1);
                     } catch (InterruptedException e) {
+                        break;
                     }
                 }
             }
@@ -97,6 +110,24 @@ public class Ticker {
 
     public boolean isRun() {
         return isRun;
+    }
+
+    @Override
+    public void gc() {
+        mGc = true;
+        isRun = false;
+        mOnTickListener = null;
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+        }
+        if (mThread != null) {
+            mThread.interrupt();
+        }
+    }
+
+    @Override
+    public boolean isGc() {
+        return mGc;
     }
 
 

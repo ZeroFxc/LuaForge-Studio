@@ -368,6 +368,7 @@
     <string name="code_editor_create">Create</string>
     <string name="code_editor_file_tree">File Tree</string>
     <string name="code_editor_no_file_open">No file open</string>
+    <string name="code_editor_loading_project">Loading project…</string>
     <string name="code_editor_close_other">Close Others</string>
     <string name="code_editor_close_all">Close All</string>
     <string name="code_editor_bottom_area_content">Bottom area content</string>
