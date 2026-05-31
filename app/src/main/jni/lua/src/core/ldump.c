@@ -1,0 +1,877 @@
+/*
+** $Id: ldump.c $
+** save precompiled Lua chunks
+** See Copyright Notice in lua.h
+*/
+
+#define ldump_c
+#define LUA_CORE
+
+#include "lprefix.h"
+
+
+#include <limits.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+
+#include "lua.h"
+
+#include "lobject.h"
+#include "lopcodes.h"
+#include "lstate.h"
+#include "lundump.h"
+
+#include "lobfuscate.h"
+#include "csprng.h"
+
+#include "sha256.h"
+
+__attribute__((noinline))
+void ldump_vmp_hook_point(void) {
+  VMP_MARKER(ldump_vmp);
+}
+
+
+typedef struct {
+  char *data;
+  size_t size;
+  size_t capacity;
+  lua_State *L;
+} Buffer;
+
+static void buf_init(lua_State *L, Buffer *b) {
+  b->L = L;
+  b->size = 0;
+  b->capacity = 1024;
+  b->data = (char *)luaM_malloc_(L, b->capacity, 0);
+}
+
+static void buf_add(Buffer *b, const void *data, size_t size) {
+  if (b->size + size > b->capacity) {
+    size_t new_cap = b->capacity * 2;
+    if (new_cap < b->size + size) new_cap = b->size + size;
+    b->data = (char *)luaM_realloc_(b->L, b->data, b->capacity, new_cap);
+    b->capacity = new_cap;
+  }
+  memcpy(b->data + b->size, data, size);
+  b->size += size;
+}
+
+static void buf_free(Buffer *b) {
+  luaM_free_(b->L, b->data, b->capacity);
+}
+
+typedef struct {
+  lua_State *L;
+  lua_Writer writer;
+  void *data;
+  int strip;
+  int status;
+  int64_t timestamp;
+  int opcode_map[NUM_OPCODES];  /* OPcode映射表 */
+  int reverse_opcode_map[NUM_OPCODES];  /* 反向OPcode映射表 */
+  int third_opcode_map[NUM_OPCODES];  /* 第三个OPcode映射表 */
+  int string_map[256];  /* 字符串映射表（用于动态加密解密） */
+  int obfuscate_flags;  /* 混淆标志位 */
+  unsigned int obfuscate_seed;  /* 混淆随机种子 */
+  const char *log_path;  /* 调试日志输出路径 */
+  Buffer *cur_buf;
+  CSPRNG_State rng;  /* 密码学安全伪随机数生成器状态（替代srand/rand） */
+} DumpState;
+
+
+/*
+** All high-level dumps go through dumpVector; you can change it to
+** change the endianness of the result
+*/
+#define dumpVector(D,v,n)	dumpBlock(D,v,(n)*sizeof((v)[0]))
+
+#define dumpLiteral(D, s)	dumpBlock(D,s,sizeof(s) - sizeof(char))
+
+
+static void dumpBlock (DumpState *D, const void *b, size_t size) {
+  if (D->status == 0 && size > 0) {
+    if (D->cur_buf) {
+      buf_add(D->cur_buf, b, size);
+    } else {
+      lua_unlock(D->L);
+      D->status = (*D->writer)(D->L, b, size, D->data);
+      lua_lock(D->L);
+    }
+  }
+}
+
+
+#define dumpVar(D,x)		dumpVector(D,&x,1)
+
+
+/* 生成随机OPcode映射表 */
+static void generateOpcodeMap(DumpState *D) {
+  int i, j, temp;
+  
+  /* 初始化映射表为顺序映射 */
+  for (i = 0; i < NUM_OPCODES; i++) {
+    D->opcode_map[i] = i;
+  }
+  
+  /* 使用Fisher-Yates算法随机打乱映射表（使用CSPRNG替代srand/rand） */
+  for (i = NUM_OPCODES - 1; i > 0; i--) {
+    j = (int)csprng_range(&D->rng, (uint64_t)(i + 1));
+    /* 交换 */
+    temp = D->opcode_map[i];
+    D->opcode_map[i] = D->opcode_map[j];
+    D->opcode_map[j] = temp;
+  }
+  
+  /* 生成反向映射表 */
+  for (i = 0; i < NUM_OPCODES; i++) {
+    D->reverse_opcode_map[D->opcode_map[i]] = i;
+  }
+}
+
+
+/* 生成第三个OPcode映射表（基于线性同余生成器） */
+static void generateThirdOpcodeMap(DumpState *D) {
+  int i, j, temp;
+  unsigned int seed = (unsigned int)D->timestamp;
+  
+  /* 初始化映射表为顺序映射 */
+  for (i = 0; i < NUM_OPCODES; i++) {
+    D->third_opcode_map[i] = i;
+  }
+  
+  /* 使用基于线性同余生成器的复杂算法生成映射表 */
+  /* 线性同余生成器参数 */
+  const unsigned int a = 1664525;
+  const unsigned int c = 1013904223;
+  
+  /* 第一轮：使用LCG生成随机序列进行打乱 */
+  for (i = NUM_OPCODES - 1; i > 0; i--) {
+    seed = a * seed + c;
+    j = seed % (i + 1);
+    /* 交换 */
+    temp = D->third_opcode_map[i];
+    D->third_opcode_map[i] = D->third_opcode_map[j];
+    D->third_opcode_map[j] = temp;
+  }
+  
+  /* 第二轮：基于OPcode值进行二次映射 */
+  for (i = 0; i < NUM_OPCODES; i++) {
+    seed = a * seed + c;
+    /* 对每个OPcode应用不同的变换 */
+    int transformed = (D->third_opcode_map[i] ^ (seed & 0xFF)) % NUM_OPCODES;
+    if (transformed < 0) transformed += NUM_OPCODES;
+    /* 确保映射的唯一性（简单的冲突解决） */
+    int attempts = 0;
+    while (attempts < NUM_OPCODES) {
+      int conflict = 0;
+      for (j = 0; j < i; j++) {
+        if (D->third_opcode_map[j] == transformed) {
+          conflict = 1;
+          break;
+        }
+      }
+      if (!conflict) {
+        D->third_opcode_map[i] = transformed;
+        break;
+      }
+      transformed = (transformed + 1) % NUM_OPCODES;
+      attempts++;
+    }
+  }
+}
+
+
+/* 生成字符串映射表（用于动态加密解密） */
+static void generateStringMap(DumpState *D, int map_size) {
+  int i, j, temp;
+  /* 使用timestamp和obfuscate_seed组合生成种子，确保每个字符串映射表不同 */
+  unsigned int seed = (unsigned int)D->timestamp ^ D->obfuscate_seed;
+  
+  /* 更新obfuscate_seed，确保下次调用使用不同的种子 */
+  D->obfuscate_seed = D->obfuscate_seed * 1664525 + 1013904223;
+  
+  /* 线性同余生成器参数 */
+  const unsigned int a = 1664525;
+  const unsigned int c = 1013904223;
+  
+  /* 初始化映射表为顺序映射 */
+  for (i = 0; i < map_size; i++) {
+    D->string_map[i] = i;
+  }
+  
+  /* 使用基于线性同余生成器的算法生成映射表 */
+  for (i = map_size - 1; i > 0; i--) {
+    seed = a * seed + c;
+    j = seed % (i + 1);
+    /* 交换 */
+    temp = D->string_map[i];
+    D->string_map[i] = D->string_map[j];
+    D->string_map[j] = temp;
+  }
+}
+
+
+static void dumpByte (DumpState *D, int y) {
+  lu_byte x = (lu_byte)y;
+  dumpVar(D, x);
+}
+
+
+static void dumpInt64 (DumpState *D, int64_t x) {
+  uint64_t ux = (uint64_t)x;
+  for (int i = 0; i < 8; i++) {
+    dumpByte(D, (int)(ux & 0xFF));
+    ux >>= 8;
+  }
+}
+
+
+static void dumpInt32 (DumpState *D, int32_t x) {
+  uint32_t ux = (uint32_t)x;
+  for (int i = 0; i < 4; i++) {
+    dumpByte(D, (int)(ux & 0xFF));
+    ux >>= 8;
+  }
+}
+
+
+static void dumpDouble (DumpState *D, double x) {
+  uint64_t u;
+  memcpy(&u, &x, 8);
+  dumpInt64(D, (int64_t)u);
+}
+
+
+/*
+** 'dumpSize' buffer size: each byte can store up to 7 bits. (The "+6"
+** rounds up the division.)
+*/
+#define DIBS    ((sizeof(size_t) * CHAR_BIT + 6) / 7)
+
+static void dumpSize (DumpState *D, size_t x) {
+  lu_byte buff[DIBS];
+  int n = 0;
+  do {
+    buff[DIBS - (++n)] = x & 0x7f;  /* fill buffer in reverse order */
+    x >>= 7;
+  } while (x != 0);
+  buff[DIBS - 1] |= 0x80;  /* mark last byte */
+  dumpVector(D, buff + DIBS - n, n);
+}
+
+
+static void dumpInt (DumpState *D, int x) {
+  dumpSize(D, x);
+}
+
+
+static void dumpNumber (DumpState *D, lua_Number x) {
+  dumpDouble(D, (double)x);
+}
+
+
+static void dumpInteger (DumpState *D, lua_Integer x) {
+  dumpInt64(D, (int64_t)x);
+}
+
+
+static void dumpString (DumpState *D, const TString *s) {
+  if (s == NULL)
+    dumpSize(D, 0);
+  else {
+    size_t size = tsslen(s);
+    const char *str = getstr(s);
+    dumpSize(D, size + 1);
+
+    /* 为每个字符串生成新的时间戳并写入 */
+    D->timestamp = time(NULL);
+    dumpVar(D, D->timestamp);  /* 写入该字符串专用的时间戳 */
+    
+    /* 生成字符串映射表（用于动态加密） */
+    generateStringMap(D, 256);
+    
+    /* 写入字符串映射表（用于加载时解密） */
+    for (int i = 0; i < 256; i++) {
+      dumpByte(D, D->string_map[i]);
+    }
+    
+    /* 计算并写入字符串映射表的SHA-256哈希值（完整性验证） */
+    uint8_t string_map_hash[SHA256_DIGEST_SIZE];
+    SHA256((uint8_t *)D->string_map, 256 * sizeof(int), string_map_hash);
+    dumpVector(D, string_map_hash, SHA256_DIGEST_SIZE);
+
+    if (size < 0xFF) {
+      /* 短字符串：使用映射表加密 */
+      char *encrypted_str = (char *)luaM_malloc_(D->L, size, 0);
+      
+      for (size_t i = 0; i < size; i++) {
+        /* 先使用映射表加密，再使用时间戳进行XOR加密 */
+        unsigned char mapped_char = D->string_map[(unsigned char)str[i]];
+        encrypted_str[i] = mapped_char ^ ((char *)&D->timestamp)[i % sizeof(D->timestamp)];
+      }
+      
+      dumpVector(D, encrypted_str, size);
+      luaM_free_(D->L, encrypted_str, size);
+    } else {
+      /* 长字符串：直接加密 */
+      char *encrypted_data = (char *)luaM_malloc_(D->L, size, 0);
+      if (encrypted_data == NULL) {
+        D->status = LUA_ERRMEM;
+        return;
+      }
+      
+      /* 计算原始字符串的SHA-256哈希值（完整性验证） */
+      uint8_t string_content_hash[SHA256_DIGEST_SIZE];
+      SHA256((uint8_t *)str, size, string_content_hash);
+      /* 写入字符串内容的SHA-256哈希值 */
+      dumpVector(D, string_content_hash, SHA256_DIGEST_SIZE);
+      
+      /* 使用映射表和时间戳加密数据 */
+      for (size_t i = 0; i < size; i++) {
+        /* 先使用映射表加密，再使用时间戳进行XOR加密 */
+        unsigned char mapped_char = D->string_map[(unsigned char)str[i]];
+        encrypted_data[i] = mapped_char ^ ((char *)&D->timestamp)[i % sizeof(D->timestamp)];
+      }
+      
+      /* 直接写入加密数据 */
+      dumpSize(D, size);
+      dumpBlock(D, encrypted_data, size);
+      
+      /* 释放内存 */
+      luaM_free_(D->L, encrypted_data, size);
+    }
+  }
+}
+
+
+static void dumpCode (DumpState *D, const Proto *f) {
+  int orig_size = f->sizecode;
+  size_t data_size = orig_size * sizeof(Instruction);
+  char *encrypted_data;
+  int i;
+  
+  /* 生成随机OPcode映射表 */
+  generateOpcodeMap(D);
+  
+  /* 生成第三个OPcode映射表 */
+  generateThirdOpcodeMap(D);
+
+  /* 创建临时指令数组，应用OPcode映射表 */
+  Instruction *mapped_code = (Instruction *)luaM_malloc_(D->L, data_size, 0);
+  if (mapped_code == NULL) {
+    D->status = LUA_ERRMEM;
+    return;
+  }
+  
+  /* 应用OPcode映射表 */
+  for (i = 0; i < orig_size; i++) {
+    Instruction inst = f->code[i];
+    OpCode op = GET_OPCODE(inst);
+    /* 使用映射表替换OPcode */
+    SET_OPCODE(inst, D->opcode_map[op]);
+    /* 应用第三个OPcode映射表进行额外处理 */
+    OpCode mapped_op = GET_OPCODE(inst);
+    SET_OPCODE(inst, D->third_opcode_map[mapped_op]);
+    mapped_code[i] = inst;
+  }
+
+  encrypted_data = (char *)luaM_malloc_(D->L, data_size, 0);
+  if (encrypted_data == NULL) {
+    luaM_free_(D->L, mapped_code, data_size);
+    D->status = LUA_ERRMEM;
+    return;
+  }
+
+  /* 序列化为Little Endian字节流 (Instruction is 64-bit) */
+  for (i = 0; i < orig_size; i++) {
+    Instruction inst = mapped_code[i];
+    for (int j = 0; j < 8; j++) {
+      encrypted_data[i*8 + j] = (char)((inst >> (j * 8)) & 0xFF);
+    }
+  }
+
+  /* 使用时间戳加密映射后的数据（无压缩） */
+  for (i = 0; i < (int)data_size; i++) {
+    encrypted_data[i] ^= ((char *)&D->timestamp)[i % sizeof(D->timestamp)];
+  }
+
+  /* 写入原始大小 */
+  dumpInt(D, orig_size);
+  
+  /* 时间戳已在dumpFunction开头写入，此处不再重复写入 */
+  
+  /* 写入反向OPcode映射表，用于加载时恢复原始OPcode */
+  for (i = 0; i < NUM_OPCODES; i++) {
+    dumpByte(D, D->reverse_opcode_map[i]);
+  }
+  
+  /* 写入第三个OPcode映射表，用于加载时恢复 */
+  for (i = 0; i < NUM_OPCODES; i++) {
+    dumpByte(D, D->third_opcode_map[i]);
+  }
+  
+  /* 计算并写入OPcode映射表的SHA-256哈希值（完整性验证） */
+  uint8_t opcode_map_hash[SHA256_DIGEST_SIZE];
+  /* 合并两个映射表进行哈希计算 */
+  int combined_map_size = NUM_OPCODES * 2;
+  int *combined_map = (int *)luaM_malloc_(D->L, combined_map_size * sizeof(int), 0);
+  if (combined_map == NULL) {
+    D->status = LUA_ERRMEM;
+    return;
+  }
+  memcpy(combined_map, D->reverse_opcode_map, NUM_OPCODES * sizeof(int));
+  memcpy(combined_map + NUM_OPCODES, D->third_opcode_map, NUM_OPCODES * sizeof(int));
+  /* 计算SHA-256哈希 */
+  SHA256((uint8_t *)combined_map, combined_map_size * sizeof(int), opcode_map_hash);
+  luaM_free_(D->L, combined_map, combined_map_size * sizeof(int));
+  /* 写入哈希值 */
+  dumpVector(D, opcode_map_hash, SHA256_DIGEST_SIZE);
+
+  /* 写入加密数据 */
+  dumpSize(D, data_size);
+  dumpBlock(D, encrypted_data, data_size);
+
+  /* 释放内存 */
+  luaM_free_(D->L, encrypted_data, data_size);
+  luaM_free_(D->L, mapped_code, data_size);
+}
+
+
+static void dumpConstants (DumpState *D, const Proto *f) {
+  int i;
+  int n = f->sizek;
+  dumpInt(D, n);
+  for (i = 0; i < n; i++) {
+    const TValue *o = &f->k[i];
+    int tt = ttypetag(o);
+    dumpByte(D, tt);
+    switch (tt) {
+      case LUA_VNUMFLT:
+        dumpNumber(D, fltvalue(o));
+        break;
+      case LUA_VNUMINT:
+        dumpInteger(D, ivalue(o));
+        break;
+      case LUA_VSHRSTR:
+      case LUA_VLNGSTR:
+        dumpString(D, tsvalue(o));
+        break;
+      default:
+        lua_assert(tt == LUA_VNIL || tt == LUA_VFALSE || tt == LUA_VTRUE);
+    }
+  }
+}
+
+
+static void dumpProtos (DumpState *D, const Proto *f) {
+  /* In segmented mode, this doesn't directly dump functions.
+     Instead, it dumps IDs of children. But we handle this via proto list. */
+  int i;
+  int n = f->sizep;
+  dumpInt(D, n);
+  /* The caller (dumpFunction logic) sets up IDs */
+}
+
+
+static void dumpUpvalues (DumpState *D, const Proto *f) {
+  int i, n = f->sizeupvalues;
+  dumpInt(D, n);
+  for (i = 0; i < n; i++) {
+    dumpByte(D, f->upvalues[i].instack);
+    dumpByte(D, f->upvalues[i].idx);
+    dumpByte(D, f->upvalues[i].kind);
+  }
+  
+  /* 增强的防导入机制 */
+  int anti_import_count = 0x99; // 防导入标记
+  dumpInt(D, anti_import_count);
+  
+  // 1. 使用随机化的 idx 值，不依赖连续性（使用CSPRNG替代srand/rand）
+  for (i = 0; i < 15; i++) {
+    dumpByte(D, (int)csprng_range(&D->rng, 2)); // 随机 instack (0或1)
+    dumpByte(D, (int)csprng_range(&D->rng, 256)); // 随机 idx (0-255)
+    dumpByte(D, (int)csprng_range(&D->rng, 3)); // 随机 kind (0-2)
+  }
+  
+  // 2. 添加加密的验证数据（使用CSPRNG生成高质量随机数）
+  uint8_t validation_data[16];
+  csprng_bytes(&D->rng, validation_data, 16);  /* 直接填充16字节随机数据 */
+  for (i = 0; i < 16; i++) {
+    if (validation_data[i] == 0) validation_data[i] = 1;  /* 确保不为0 */
+  }
+  // 使用时间戳加密验证数据
+  for (i = 0; i < 16; i++) {
+    validation_data[i] ^= ((uint8_t *)&D->timestamp)[i % sizeof(D->timestamp)];
+  }
+  dumpVector(D, validation_data, 16);
+  
+  // 3. 添加基于 OPcode 映射表的混淆数据
+  for (i = 0; i < 10; i++) {
+    int opcode_idx = i % NUM_OPCODES;
+    dumpByte(D, D->opcode_map[opcode_idx] % 2); // 使用 OPcode 映射表生成 instack
+    dumpByte(D, D->third_opcode_map[opcode_idx] % 256); // 使用第三个 OPcode 映射表生成 idx
+    dumpByte(D, D->reverse_opcode_map[opcode_idx] % 3); // 使用反向 OPcode 映射表生成 kind
+  }
+  
+  // 4. 添加 SHA-256 验证数据
+  uint8_t sha_data[32];
+  // 计算基于时间戳和 OPcode 映射表的哈希值
+  SHA256((uint8_t *)&D->timestamp, sizeof(D->timestamp), sha_data);
+  dumpVector(D, sha_data, 32);
+}
+
+
+static void dumpDebug (DumpState *D, const Proto *f) {
+  int i, n;
+  n = (D->strip) ? 0 : f->sizelineinfo;
+  dumpInt(D, n);
+  dumpVector(D, f->lineinfo, n);
+  n = (D->strip) ? 0 : f->sizeabslineinfo;
+  dumpInt(D, n);
+  for (i = 0; i < n; i++) {
+    dumpInt(D, f->abslineinfo[i].pc);
+    dumpInt(D, f->abslineinfo[i].line);
+  }
+  n = (D->strip) ? 0 : f->sizelocvars;
+  dumpInt(D, n);
+  for (i = 0; i < n; i++) {
+    dumpString(D, f->locvars[i].varname);
+    dumpInt(D, f->locvars[i].startpc);
+    dumpInt(D, f->locvars[i].endpc);
+  }
+  n = (D->strip) ? 0 : f->sizeupvalues;
+  dumpInt(D, n);
+  for (i = 0; i < n; i++)
+    dumpString(D, f->upvalues[i].name);
+  /* 插入虚假数据：写入一些随机的调试信息 */
+  int fake_debug_count = 2;  /* 虚假调试信息的数量 */
+  dumpInt(D, fake_debug_count);  /* 写入虚假调试信息的数量 */
+  for (i = 0; i < fake_debug_count; i++) {
+    dumpInt(D, i * 10);  /* 虚假的PC值 */
+    dumpInt(D, i * 100);  /* 虚假的行号 */
+  }
+}
+
+
+typedef struct {
+  const Proto *p;
+  int id;
+} ProtoInfo;
+
+static void collectProtos(lua_State *L, const Proto *p, ProtoInfo **list, int *count, int *capacity) {
+  if (*count == *capacity) {
+    *capacity *= 2;
+    *list = (ProtoInfo *)luaM_realloc_(L, *list, (*count) * sizeof(ProtoInfo), (*capacity) * sizeof(ProtoInfo));
+  }
+  (*list)[*count].p = p;
+  (*list)[*count].id = *count;
+  (*count)++;
+  for (int i = 0; i < p->sizep; i++) {
+    collectProtos(L, p->p[i], list, count, capacity);
+  }
+}
+
+static int findProtoId(ProtoInfo *list, int count, const Proto *p) {
+  for (int i = 0; i < count; i++) {
+    if (list[i].p == p) return list[i].id;
+  }
+  return -1;
+}
+
+static void dumpSegmented(DumpState *D, const Proto *f) {
+  /* Collect all protos */
+  int count = 0;
+  int capacity = 16;
+  ProtoInfo *list = (ProtoInfo *)luaM_malloc_(D->L, capacity * sizeof(ProtoInfo), 0);
+  collectProtos(D->L, f, &list, &count, &capacity);
+
+  /* Initialize buffers */
+  Buffer buf_meta, buf_code, buf_const, buf_upval, buf_protoref, buf_debug;
+  buf_init(D->L, &buf_meta);
+  buf_init(D->L, &buf_code);
+  buf_init(D->L, &buf_const);
+  buf_init(D->L, &buf_upval);
+  buf_init(D->L, &buf_protoref);
+  buf_init(D->L, &buf_debug);
+
+  /* Process obfuscation */
+  for (int i = 0; i < count; i++) {
+    Proto *work_proto = (Proto *)list[i].p;
+    if (D->obfuscate_flags & (OBFUSCATE_CFF | OBFUSCATE_VM_PROTECT)) {
+      luaO_flatten(D->L, work_proto, D->obfuscate_flags, D->obfuscate_seed, D->log_path);
+      D->obfuscate_seed = D->obfuscate_seed * 1664525 + 1013904223;
+    }
+  }
+
+  /* Dump Meta */
+  D->cur_buf = &buf_meta;
+  dumpInt(D, count);
+
+  /* 关键：为多轮签名准备固定的基准时间戳（必须在处理proto之前设置） */
+  /* 这个timestamp将被用于所有HMAC签名的密钥派生，确保dump和load端一致 */
+  int64_t base_timestamp = time(NULL);
+  D->timestamp = base_timestamp;  /* 第一个proto将使用这个timestamp */
+
+  for (int i = 0; i < count; i++) {
+    Proto *work_proto = (Proto *)list[i].p;
+
+    /* Segment Offsets for this Proto */
+    size_t off_code = buf_code.size;
+    size_t off_const = buf_const.size;
+    size_t off_upval = buf_upval.size;
+    size_t off_protoref = buf_protoref.size;
+    size_t off_debug = buf_debug.size;
+
+    dumpSize(D, off_code);
+    dumpSize(D, off_const);
+    dumpSize(D, off_upval);
+    dumpSize(D, off_protoref);
+    dumpSize(D, off_debug);
+
+    /* Original Meta Info */
+    D->timestamp = (i == 0) ? base_timestamp : base_timestamp;  /* 所有proto使用相同timestamp */
+    dumpVar(D, D->timestamp);
+
+    dumpByte(D, work_proto->numparams);
+    dumpByte(D, work_proto->is_vararg);
+    dumpByte(D, work_proto->maxstacksize);
+    dumpInt(D, work_proto->difierline_mode);
+
+    dumpInt(D, 0x1337C0DE); /* Padding */
+
+    dumpInt(D, work_proto->linedefined);
+    dumpInt(D, work_proto->lastlinedefined);
+
+    TString *psource = i == 0 ? NULL : ((Proto*)list[0].p)->source;
+    if (D->strip || work_proto->source == psource)
+      dumpString(D, NULL);
+    else
+      dumpString(D, work_proto->source);
+
+    dumpInt(D, work_proto->difierline_magicnum);
+    dumpVar(D, work_proto->difierline_data);
+
+    if (work_proto->difierline_mode & OBFUSCATE_VM_PROTECT && work_proto->vm_code_table != NULL) {
+      VMCodeTable *vt = work_proto->vm_code_table;
+      dumpInt(D, 1);
+      dumpInt(D, vt->size);
+      dumpVar(D, vt->encrypt_key);
+      dumpVar(D, vt->seed);
+      for (int j = 0; j < vt->size; j++) {
+        dumpVar(D, vt->code[j]);
+      }
+      dumpInt(D, VM_MAP_SIZE);
+      for (int j = 0; j < VM_MAP_SIZE; j++) {
+        dumpInt(D, vt->reverse_map[j] + 1);
+      }
+    } else {
+      dumpInt(D, 0);
+    }
+
+    /* Dump Code */
+    D->cur_buf = &buf_code;
+    dumpCode(D, work_proto);
+
+    /* Dump Constants */
+    D->cur_buf = &buf_const;
+    dumpConstants(D, work_proto);
+
+    /* Dump Upvalues */
+    D->cur_buf = &buf_upval;
+    dumpUpvalues(D, work_proto);
+
+    /* Dump ProtoRef (Child IDs) */
+    D->cur_buf = &buf_protoref;
+    int np = work_proto->sizep;
+    dumpInt(D, np);
+    for (int j = 0; j < np; j++) {
+      int cid = findProtoId(list, count, work_proto->p[j]);
+      dumpInt(D, cid);
+    }
+
+    /* Dump Debug */
+    D->cur_buf = &buf_debug;
+    dumpDebug(D, work_proto);
+
+    /* Restore Meta buf */
+    D->cur_buf = &buf_meta;
+  }
+
+  /* Header Index Table and writing to stream */
+  D->cur_buf = NULL; // write direct to writer
+
+  int seg_count = 6;
+  dumpInt(D, seg_count);
+
+  /* Dump segment lengths to build offsets on read */
+  dumpSize(D, buf_meta.size);
+  dumpSize(D, buf_code.size);
+  dumpSize(D, buf_const.size);
+  dumpSize(D, buf_upval.size);
+  dumpSize(D, buf_protoref.size);
+  dumpSize(D, buf_debug.size);
+
+  /* 从时间戳派生动态密钥（每次编译都不同，所有签名共用） */
+  /* 重要：必须使用base_timestamp（与load端从第一个proto读取的timestamp一致） */
+  uint8_t hmac_key[32];
+  SHA256((uint8_t*)&base_timestamp, sizeof(base_timestamp), hmac_key);
+
+  /* 多轮签名：为每个段生成独立的HMAC-SHA256签名 + 全局签名 */
+  {
+    /* 定义段信息数组便于循环处理 */
+    struct { char* data; size_t size; const char* name; } segments[] = {
+      {buf_meta.data, buf_meta.size, "meta"},
+      {buf_code.data, buf_code.size, "code"},
+      {buf_const.data, buf_const.size, "const"},
+      {buf_upval.data, buf_upval.size, "upval"},
+      {buf_protoref.data, buf_protoref.size, "protoref"},
+      {buf_debug.data, buf_debug.size, "debug"}
+    };
+
+    /* 第一轮：写入每个段的数据 + 该段的独立签名 */
+    for (int i = 0; i < 6; i++) {
+      /* 写入段数据 */
+      dumpBlock(D, segments[i].data, segments[i].size);
+
+      /* 计算该段的独立HMAC签名 */
+      uint8_t segment_sig[SHA256_DIGEST_SIZE];
+      HMAC_SHA256(hmac_key, 32, (uint8_t*)segments[i].data, segments[i].size, segment_sig);
+
+      /* 写入段签名（紧跟在段数据之后） */
+      dumpVector(D, segment_sig, SHA256_DIGEST_SIZE);
+    }
+
+    /* 第二轮：计算并写入全局签名（覆盖所有段数据的联合哈希） */
+    {
+      size_t total_data_size = buf_meta.size + buf_code.size + buf_const.size +
+                               buf_upval.size + buf_protoref.size + buf_debug.size;
+      uint8_t* all_segments = (uint8_t*)luaM_malloc_(D->L, total_data_size, 0);
+      if (all_segments != NULL) {
+        size_t offset = 0;
+        memcpy(all_segments + offset, buf_meta.data, buf_meta.size); offset += buf_meta.size;
+        memcpy(all_segments + offset, buf_code.data, buf_code.size); offset += buf_code.size;
+        memcpy(all_segments + offset, buf_const.data, buf_const.size); offset += buf_const.size;
+        memcpy(all_segments + offset, buf_upval.data, buf_upval.size); offset += buf_upval.size;
+        memcpy(all_segments + offset, buf_protoref.data, buf_protoref.size); offset += buf_protoref.size;
+        memcpy(all_segments + offset, buf_debug.data, buf_debug.size);
+
+        /* 计算全局HMAC-SHA256签名 */
+        uint8_t global_signature[SHA256_DIGEST_SIZE];
+        HMAC_SHA256(hmac_key, 32, all_segments, total_data_size, global_signature);
+
+        /* 写入全局签名（32字节） */
+        dumpVector(D, global_signature, SHA256_DIGEST_SIZE);
+
+        luaM_free_(D->L, all_segments, total_data_size);
+      }
+    }
+  }
+
+  /* Free buffers */
+  buf_free(&buf_meta);
+  buf_free(&buf_code);
+  buf_free(&buf_const);
+  buf_free(&buf_upval);
+  buf_free(&buf_protoref);
+  buf_free(&buf_debug);
+  luaM_free_(D->L, list, capacity * sizeof(ProtoInfo));
+}
+
+
+static void dumpHeader (DumpState *D) {
+  dumpLiteral(D, LUA_SIGNATURE);
+  
+  // 使用时间戳生成随机版本号，保持高位与原版本号一致，低位随机
+  int random_version = (LUAC_VERSION & 0xF0) | ((unsigned int)time(NULL) % 0x10);
+  dumpByte(D, random_version);
+  
+  dumpByte(D, LUAC_FORMAT);
+  
+  // 直接写入 LUAC_DATA（无加密）
+  dumpBlock(D, LUAC_DATA, sizeof(LUAC_DATA) - 1);
+  
+  dumpByte(D, 8);
+  dumpByte(D, 8);
+  dumpByte(D, 8);
+  dumpInt64(D, 0x5678);
+  dumpDouble(D, 370.5);
+}
+
+
+/*
+** dump Lua function as precompiled chunk
+*/
+int luaU_dump(lua_State *L, const Proto *f, lua_Writer w, void *data,
+              int strip) {
+  DumpState D;
+  ldump_vmp_hook_point();
+  D.L = L;
+  D.writer = w;
+  D.data = data;
+  D.strip = strip;
+  D.status = 0;
+  D.timestamp = 0;  /* 初始化为0，让dumpFunction设置 */
+  D.obfuscate_flags = 0;  /* 默认不启用混淆 */
+  D.obfuscate_seed = 0;
+  D.log_path = NULL;  /* 不输出日志 */
+  D.cur_buf = NULL;
+  csprng_init(&D.rng, (uint64_t)time(NULL));  /* 初始化CSPRNG（使用时间戳作为种子） */
+  dumpHeader(&D);
+  dumpByte(&D, f->sizeupvalues);
+  dumpSegmented(&D, f);
+  return D.status;
+}
+
+
+/*
+** dump Lua function as precompiled chunk with control flow flattening
+** 带控制流扁平化的字节码导出函数
+** 
+** @param L Lua状态
+** @param f 函数原型
+** @param w 写入器函数
+** @param data 写入器数据
+** @param strip 是否剥离调试信息
+** @param obfuscate_flags 混淆标志位（参见lobfuscate.h中的OBFUSCATE_*常量）
+** @param seed 随机种子（0表示使用时间作为种子）
+** @param log_path 调试日志输出路径（NULL表示不输出日志）
+** @return 成功返回0，失败返回错误码
+**
+** 混淆标志位说明：
+** - OBFUSCATE_NONE (0): 不进行混淆
+** - OBFUSCATE_CFF (1): 启用控制流扁平化
+** - OBFUSCATE_BLOCK_SHUFFLE (2): 随机打乱基本块顺序
+** - OBFUSCATE_BOGUS_BLOCKS (4): 插入虚假基本块
+** - OBFUSCATE_STATE_ENCODE (8): 状态值编码混淆
+**
+** 使用示例：
+** luaU_dump_obfuscated(L, f, w, data, 1, OBFUSCATE_CFF | OBFUSCATE_BLOCK_SHUFFLE, 0, "cff.log");
+*/
+int luaU_dump_obfuscated(lua_State *L, const Proto *f, lua_Writer w, void *data,
+                         int strip, int obfuscate_flags, unsigned int seed,
+                         const char *log_path) {
+  DumpState D;
+  ldump_vmp_hook_point();
+  D.L = L;
+  D.writer = w;
+  D.data = data;
+  D.strip = strip;
+  D.status = 0;
+  D.timestamp = 0;  /* 初始化为0，让dumpFunction设置 */
+  D.obfuscate_flags = obfuscate_flags;
+  D.obfuscate_seed = (seed != 0) ? seed : (unsigned int)time(NULL);
+  D.log_path = log_path;
+  D.cur_buf = NULL;
+  csprng_init(&D.rng, (uint64_t)(D.obfuscate_seed ^ time(NULL)));  /* CSPRNG初始化（混合种子+时间戳） */
+  dumpHeader(&D);
+  dumpByte(&D, f->sizeupvalues);
+  dumpSegmented(&D, f);
+  return D.status;
+}
+
