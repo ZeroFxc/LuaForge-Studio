@@ -1,6 +1,7 @@
 <resources>
 
-    <style name="AppTheme" parent="Theme.Material3.Dark.NoActionBar"></style>
+    <style name="AppTheme" parent="Theme.Material3.Blue.Dark.NoActionBar">
+    </style>
 
     <!-- Green -->
     <style name="Theme.Material3.Green" parent="@style/Theme.Material3.Dark">
