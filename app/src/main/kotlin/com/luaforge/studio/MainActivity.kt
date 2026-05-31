@@ -119,6 +119,13 @@ enum class ConflictAction {
     OVERWRITE, CLONE,
 }
 
+enum class DirPickerTarget {
+    PRIMARY, ADDITIONAL
+}
+
+/** 替换附加目录时记录索引 */
+data class DirReplaceInfo(val index: Int)
+
 @Composable
 fun MainApp() {
     TransparentSystemBars()
@@ -131,6 +138,27 @@ fun MainApp() {
     val context = LocalContext.current
 
     val settings = SettingsManager.currentSettings
+
+    val allProjectPaths by remember(settings.projectStoragePath, settings.additionalProjectPaths) {
+        derivedStateOf {
+            FileUtil.getAllProjectPaths(context)
+        }
+    }
+
+    val primaryProjectsPath by remember(settings.projectStoragePath) {
+        derivedStateOf {
+            FileUtil.getProjectsPath(context).ifBlank {
+                context.getExternalFilesDir(null)?.resolve("projects")?.absolutePath ?: ""
+            }
+        }
+    }
+
+    suspend fun refreshProjects() {
+        ProjectUtil.loadProjectsFromDirectories(allProjectPaths) { newItems ->
+            projectItems = newItems
+        }
+    }
+
     val toastPosition = settings.toastPosition
 
     val toastTransitionSpec: AnimatedContentTransitionScope<ToastData?>.() -> ContentTransform = {
@@ -141,21 +169,11 @@ fun MainApp() {
         when (currentScreen) {
             AppScreen.NEW_PROJECT -> {
                 currentScreen = AppScreen.MAIN
-                scope.launch {
-                    val projectsPath = FileUtil.getProjectsPath(context)
-                    ProjectUtil.loadProjectsFromDirectory(projectsPath) { newItems ->
-                        projectItems = newItems
-                    }
-                }
+                scope.launch { refreshProjects() }
             }
             AppScreen.EDITOR -> {
                 currentScreen = AppScreen.MAIN
-                scope.launch {
-                    val projectsPath = FileUtil.getProjectsPath(context)
-                    ProjectUtil.loadProjectsFromDirectory(projectsPath) { newItems ->
-                        projectItems = newItems
-                    }
-                }
+                scope.launch { refreshProjects() }
             }
             else -> {}
         }
@@ -184,27 +202,20 @@ fun MainApp() {
                         },
                         projectItems = projectItems,
                         onProjectItemsChanged = { newItems -> projectItems = newItems },
-                        toast = toast
+                        toast = toast,
+                        allProjectPaths = allProjectPaths,
+                        primaryProjectsPath = primaryProjectsPath,
+                        onRefreshProjects = { refreshProjects() }
                     )
                     AppScreen.NEW_PROJECT -> {
                         NewProjectScreen(
                             onBack = {
                                 currentScreen = AppScreen.MAIN
-                                scope.launch {
-                                    val projectsPath = FileUtil.getProjectsPath(context)
-                                    ProjectUtil.loadProjectsFromDirectory(projectsPath) { newItems ->
-                                        projectItems = newItems
-                                    }
-                                }
+                                scope.launch { refreshProjects() }
                             },
                             onCreateProject = { newProjectData ->
                                 LogCatcher.i("MainApp", "项目创建成功: ${newProjectData.projectName}")
-                                scope.launch {
-                                    val projectsPath = FileUtil.getProjectsPath(context)
-                                    ProjectUtil.loadProjectsFromDirectory(projectsPath) { newItems ->
-                                        projectItems = newItems
-                                    }
-                                }
+                                scope.launch { refreshProjects() }
                             },
                             toast = toast
                         )
@@ -216,12 +227,7 @@ fun MainApp() {
                                     project = project,
                                     onBack = {
                                         currentScreen = AppScreen.MAIN
-                                        scope.launch {
-                                            val projectsPath = FileUtil.getProjectsPath(context)
-                                            ProjectUtil.loadProjectsFromDirectory(projectsPath) { newItems ->
-                                                projectItems = newItems
-                                            }
-                                        }
+                                        scope.launch { refreshProjects() }
                                     },
                                     toast = toast
                                 )
@@ -258,7 +264,10 @@ fun MainScreen(
     onNavigateToEditor: (ProjectItem) -> Unit,
     projectItems: List<ProjectItem>,
     onProjectItemsChanged: (List<ProjectItem>) -> Unit,
-    toast: NonBlockingToastState
+    toast: NonBlockingToastState,
+    allProjectPaths: List<String>,
+    primaryProjectsPath: String,
+    onRefreshProjects: suspend () -> Unit
 ) {
 
     val packageInfo = AppInfoUtil.getPackageInfo()
@@ -272,6 +281,8 @@ fun MainScreen(
     val context = LocalContext.current
     val settingsManager = SettingsManager
     val currentSettings = settingsManager.currentSettings
+
+    // ---- 配置项目目录状态 ----
 
     // 搜索相关状态
     var isSearchActive by remember { mutableStateOf(false) }
@@ -303,11 +314,12 @@ fun MainScreen(
     var conflictAction by remember { mutableStateOf<ConflictAction?>(null) }
     // --------------------------
 
-    val projectsPath by remember(currentSettings.projectStoragePath) {
-        derivedStateOf {
-            FileUtil.getProjectsPath(context)
-        }
-    }
+    // ---- 配置项目目录状态 ----
+    var showConfigDirDialog by remember { mutableStateOf(false) }
+    var showDirPicker by remember { mutableStateOf(false) }
+    var dirPickerTarget by remember { mutableStateOf(DirPickerTarget.PRIMARY) }
+    var dirReplaceIndex by remember { mutableStateOf(-1) }
+    // --------------------------
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteProjectId by remember { mutableStateOf("") }
@@ -330,12 +342,12 @@ fun MainScreen(
         }
     }
 
-    LaunchedEffect(currentSettings.projectStoragePath) {
-        ProjectUtil.loadProjectsFromDirectory(projectsPath, onProjectItemsChanged)
+    LaunchedEffect(allProjectPaths) {
+        onRefreshProjects()
     }
 
     LaunchedEffect(Unit) {
-        ProjectUtil.loadProjectsFromDirectory(projectsPath, onProjectItemsChanged)
+        onRefreshProjects()
     }
 
     // 搜索过滤后的项目列表
@@ -432,7 +444,7 @@ fun MainScreen(
                         }
 
                         showToast(context.getString(R.string.project_deleted, it.name))
-                        ProjectUtil.loadProjectsFromDirectory(projectsPath, onProjectItemsChanged)
+                        scope.launch { onRefreshProjects() }
                     }
                 } catch (e: Exception) {
                     LogCatcher.e("MainScreen", "删除项目失败", e)
@@ -902,6 +914,13 @@ fun MainScreen(
                                                 showFilePicker = true
                                             }
                                         )
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.config_project_dir)) },
+                                            onClick = {
+                                                moreMenuExpanded = false
+                                                showConfigDirDialog = true
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -1002,10 +1021,7 @@ fun MainScreen(
                                             isRefreshing = true
                                             val previousItems = projectItems.toList()
                                             val previousSize = previousItems.size
-                                            ProjectUtil.loadProjectsFromDirectory(
-                                                projectsPath,
-                                                onProjectItemsChanged
-                                            )
+                                            scope.launch { onRefreshProjects() }
                                             val newItems = projectItems
                                             val sizeChanged = newItems.size != previousSize
                                             val contentChanged = newItems != previousItems
@@ -1167,7 +1183,7 @@ fun MainScreen(
                         scope.launch { toast.showToast(context.getString(R.string.invalid_project_name)) }
                         return@TextButton
                     }
-                    val targetDir = File(projectsPath, label)
+                    val targetDir = File(primaryProjectsPath, label)
                     if (targetDir.exists()) {
                         conflictLabel = label
                         conflictPath = targetDir.absolutePath
@@ -1175,12 +1191,7 @@ fun MainScreen(
                     } else {
                         scope.launch {
                             performImport(selectedImportFile!!, targetDir, toast) {
-                                scope.launch {
-                                    ProjectUtil.loadProjectsFromDirectory(
-                                        projectsPath,
-                                        onProjectItemsChanged
-                                    )
-                                }
+                                scope.launch { onRefreshProjects() }
                             }
                         }
                     }
@@ -1204,36 +1215,26 @@ fun MainScreen(
                     TextButton(onClick = {
                         showConflictDialog = false
                         conflictAction = ConflictAction.OVERWRITE
-                        val targetDir = File(projectsPath, conflictLabel)
+                        val targetDir = File(primaryProjectsPath, conflictLabel)
                         scope.launch {
                             targetDir.deleteRecursively()
                             performImport(selectedImportFile!!, targetDir, toast) {
-                                scope.launch {
-                                    ProjectUtil.loadProjectsFromDirectory(
-                                        projectsPath,
-                                        onProjectItemsChanged
-                                    )
-                                }
+                                scope.launch { onRefreshProjects() }
                             }
                         }
                     }) { Text(stringResource(R.string.overwrite)) }
                     TextButton(onClick = {
                         showConflictDialog = false
                         conflictAction = ConflictAction.CLONE
-                        var cloneDir = File(projectsPath, "${conflictLabel}_clone")
+                        var cloneDir = File(primaryProjectsPath, "${conflictLabel}_clone")
                         var counter = 1
                         while (cloneDir.exists()) {
                             counter++
-                            cloneDir = File(projectsPath, "${conflictLabel}_clone$counter")
+                            cloneDir = File(primaryProjectsPath, "${conflictLabel}_clone$counter")
                         }
                         scope.launch {
                             performImport(selectedImportFile!!, cloneDir, toast) {
-                                scope.launch {
-                                    ProjectUtil.loadProjectsFromDirectory(
-                                        projectsPath,
-                                        onProjectItemsChanged
-                                    )
-                                }
+                                scope.launch { onRefreshProjects() }
                             }
                         }
                     }) { Text(stringResource(R.string.clone)) }
@@ -1241,6 +1242,145 @@ fun MainScreen(
                 }
             },
             dismissButton = {}
+        )
+    }
+
+    // ---- 配置项目目录文件选择器 ----
+    if (showDirPicker) {
+        FilePickerDialog(
+            initialPath = Environment.getExternalStorageDirectory().absolutePath,
+            selectionMode = SelectionMode.DIRECTORY,
+            title = stringResource(R.string.select_project_dir),
+            onDismiss = { showDirPicker = false },
+            onDirectorySelected = { selectedPath ->
+                showDirPicker = false
+                when (dirPickerTarget) {
+                    DirPickerTarget.PRIMARY -> {
+                        val updatedSettings = currentSettings.copy(
+                            projectStoragePath = selectedPath
+                        )
+                        SettingsManager.updateSettings(updatedSettings)
+                        SettingsManager.saveSettings(context)
+                        scope.launch { onRefreshProjects() }
+                    }
+                    DirPickerTarget.ADDITIONAL -> {
+                        val newPaths = currentSettings.additionalProjectPaths.toMutableList()
+                        newPaths.add(selectedPath)
+                        val updatedSettings = currentSettings.copy(
+                            additionalProjectPaths = newPaths
+                        )
+                        SettingsManager.updateSettings(updatedSettings)
+                        SettingsManager.saveSettings(context)
+                        scope.launch { onRefreshProjects() }
+                    }
+                }
+            }
+        )
+    }
+
+    // ---- 配置项目目录弹窗 ----
+    if (showConfigDirDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfigDirDialog = false },
+            title = { Text(stringResource(R.string.config_project_dirs)) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    var modifiedPaths by remember(currentSettings.additionalProjectPaths) {
+                        mutableStateOf(currentSettings.additionalProjectPaths.toMutableList())
+                    }
+
+                    // 主目录
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.primary_dir),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                currentSettings.projectStoragePath,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        OutlinedButton(onClick = {
+                            dirPickerTarget = DirPickerTarget.PRIMARY
+                            showDirPicker = true
+                        }) {
+                            Text(stringResource(R.string.modify))
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // 附加目录列表
+                    Text(
+                        stringResource(R.string.additional_dir),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    modifiedPaths.forEachIndexed { index, path ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                path,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            IconButton(onClick = {
+                                modifiedPaths.removeAt(index)
+                                val updatedSettings = currentSettings.copy(
+                                    additionalProjectPaths = modifiedPaths.toList()
+                                )
+                                SettingsManager.updateSettings(updatedSettings)
+                                SettingsManager.saveSettings(context)
+                                scope.launch { onRefreshProjects() }
+                            }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = stringResource(R.string.remove_dir),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 添加目录按钮
+                    OutlinedButton(
+                        onClick = {
+                            dirPickerTarget = DirPickerTarget.ADDITIONAL
+                            showDirPicker = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.add_dir))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showConfigDirDialog = false }) {
+                    Text(stringResource(R.string.ok))
+                }
+            }
         )
     }
 }

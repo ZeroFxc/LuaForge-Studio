@@ -48,6 +48,7 @@ private object PreferencesKeys {
     val ENABLE_TAB_HISTORY = booleanPreferencesKey("enable_tab_history")
     val INDENT_GUIDE_ENABLED = booleanPreferencesKey("indentGuideEnabled")
     val PROJECT_STORAGE_PATH = stringPreferencesKey("project_storage_path")
+    val ADDITIONAL_PROJECT_PATHS = stringPreferencesKey("additional_project_paths")
 
     // 语法高亮颜色
     val CLASS_NAME_COLOR = intPreferencesKey("syntax_class_name_color")
@@ -227,11 +228,23 @@ object SettingsManager {
         // 【新增】加载滑动手势开关
         val enableSwipeGesture = preferences[PreferencesKeys.ENABLE_SWIPE_GESTURE] ?: false
 
+        val additionalProjectPathsJson = preferences[PreferencesKeys.ADDITIONAL_PROJECT_PATHS] ?: "[]"
+        val additionalProjectPaths: List<String> = try {
+            val type = object : TypeToken<List<String>>() {}.type
+            Gson().fromJson(additionalProjectPathsJson, type)
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+        val storedProjectPath = preferences[PreferencesKeys.PROJECT_STORAGE_PATH] ?: ""
+        val projectStoragePath = storedProjectPath.ifBlank { fixedPath }
+
         updateSettings(
             SettingsData(
                 themeType = themeType,
                 darkMode = darkMode,
-                projectStoragePath = fixedPath,
+                projectStoragePath = projectStoragePath,
+                additionalProjectPaths = additionalProjectPaths,
                 fontSizeScale = fontSizeScale,
                 shapeSizeIndex = shapeSizeIndex,
                 fontFamilyType = fontFamilyType,
@@ -276,6 +289,9 @@ object SettingsManager {
             preferences[PreferencesKeys.ENABLE_TAB_HISTORY] = currentSettings.enableTabHistory
             preferences[PreferencesKeys.INDENT_GUIDE_ENABLED] = currentSettings.indentGuideEnabled
             preferences[PreferencesKeys.PROJECT_STORAGE_PATH] = currentSettings.projectStoragePath
+
+            val additionalPathsJson = Gson().toJson(currentSettings.additionalProjectPaths)
+            preferences[PreferencesKeys.ADDITIONAL_PROJECT_PATHS] = additionalPathsJson
 
             preferences[PreferencesKeys.CLASS_NAME_COLOR] = currentSettings.classNameColor.toArgb()
             preferences[PreferencesKeys.LOCAL_VAR_COLOR] =
@@ -394,6 +410,7 @@ data class SettingsData(
     val themeType: ThemeType = ThemeType.GREEN,
     val darkMode: DarkMode = DarkMode.FOLLOW_SYSTEM,
     val projectStoragePath: String = "/storage/emulated/0/LuaForge-Studio/project/",
+    val additionalProjectPaths: List<String> = emptyList(),
     val fontSizeScale: Float = 1.0f,
     val shapeSizeIndex: Int = 2,
     val fontFamilyType: FontFamilyType = FontFamilyType.DEFAULT,

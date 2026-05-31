@@ -19,6 +19,16 @@
     <string name="more">更多</string>
     <string name="create_project">创建项目</string>
     <string name="import_source">导入源码</string>
+    <string name="config_project_dir">配置项目目录</string>
+    <string name="config_project_dirs">配置项目目录</string>
+    <string name="add_dir">添加目录</string>
+    <string name="remove_dir">移除目录</string>
+    <string name="primary_dir">主目录</string>
+    <string name="additional_dir">附加目录</string>
+    <string name="default_project_dir">默认项目目录</string>
+    <string name="select_project_dir">选择项目目录</string>
+    <string name="file_picker_select_dir">选择目录</string>
+    <string name="modify">修改</string>
     <string name="share">分享</string>
     <string name="pin">置顶</string>
     <string name="unpin">撤顶</string>

@@ -65,6 +65,55 @@ object ProjectUtil {
     }
 
     /**
+     * 从多个目录加载项目
+     */
+    suspend fun loadProjectsFromDirectories(
+        paths: List<String>,
+        onProjectItemsChanged: (List<ProjectItem>) -> Unit
+    ) {
+        withContext(Dispatchers.IO) {
+            if (paths.isEmpty()) {
+                withContext(Dispatchers.Main) {
+                    onProjectItemsChanged(emptyList())
+                }
+                return@withContext
+            }
+
+            val projectList = mutableListOf<ProjectItem>()
+            val seenPaths = mutableSetOf<String>()
+
+            for (projectsPath in paths) {
+                if (projectsPath.isBlank()) continue
+                val projectsDir = File(projectsPath)
+
+                if (!projectsDir.exists() || !projectsDir.isDirectory) {
+                    projectsDir.mkdirs()
+                    continue
+                }
+
+                projectsDir.listFiles()?.forEach { projectDir ->
+                    if (projectDir.isDirectory && seenPaths.add(projectDir.absolutePath)) {
+                        val projectItem = ProjectItem(
+                            id = projectDir.name,
+                            name = projectDir.name,
+                            path = projectDir.absolutePath,
+                            createdDate = Date(projectDir.lastModified()),
+                            modifiedDate = Date(projectDir.lastModified())
+                        )
+                        projectList.add(projectItem)
+                    }
+                }
+            }
+
+            projectList.sortByDescending { it.modifiedDate }
+
+            withContext(Dispatchers.Main) {
+                onProjectItemsChanged(projectList)
+            }
+        }
+    }
+
+    /**
      * 生成默认项目名称
      */
     fun generateDefaultProjectName(projectsDir: File): String {
@@ -93,9 +142,9 @@ object ProjectUtil {
             .lowercase()
 
         return if (cleanedName.isNotEmpty()) {
-            "myluaapp.$cleanedName"
+            "mylxcluaapp.$cleanedName"
         } else {
-            "myluaapp.myapplication"
+            "mylxcluaapp.myapplication"
         }
     }
 

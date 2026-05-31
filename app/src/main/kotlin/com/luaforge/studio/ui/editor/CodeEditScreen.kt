@@ -1159,25 +1159,25 @@ private suspend fun loadProjectFiles(
         } else {
             val lastOpenedFile = viewModel.getLastOpenedFile()
             if (lastOpenedFile != null && lastOpenedFile.exists() && lastOpenedFile.isFile) {
-                viewModel.openFile(lastOpenedFile, projectPath)
+                viewModel.openFileSync(lastOpenedFile, projectPath)
             } else if (validHistoryFiles.isNotEmpty()) {
-                viewModel.openFile(validHistoryFiles[0], projectPath)
+                viewModel.openFileSync(validHistoryFiles[0], projectPath)
             }
         }
     } else {
         val mainLuaFile = File(projectPath, "main.lua")
         if (mainLuaFile.exists() && mainLuaFile.isFile) {
-            viewModel.openFile(mainLuaFile, projectPath)
+            viewModel.openFileSync(mainLuaFile, projectPath)
         } else {
             val luaFiles =
                 File(projectPath).listFiles { _, name -> name.endsWith(".lua", ignoreCase = true) }
             if (luaFiles != null && luaFiles.isNotEmpty()) {
                 luaFiles.sortBy { it.name }
-                viewModel.openFile(luaFiles[0], projectPath)
+                viewModel.openFileSync(luaFiles[0], projectPath)
             }
         }
     }
-    viewModel.cleanupNonExistentFiles()
+    viewModel.cleanupNonExistentFilesSync()
 }
 
 fun colorToHex(color: Color, includeAlpha: Boolean = false): String {

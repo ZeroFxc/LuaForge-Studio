@@ -992,6 +992,39 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     fun openFile(file: File) = openFile(file, file.parentFile?.absolutePath ?: "")
 
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    suspend fun openFileSync(file: File, projectPath: String) {
+        if (currentProjectPath != projectPath) {
+            resetForNewProject(projectPath)
+            setCurrentProject(projectPath, File(projectPath).name)
+        }
+        if (file.isDirectory || !file.exists() || !file.canRead()) return
+        val existingIndex = openFiles.indexOfFirst { it.file.absolutePath == file.absolutePath }
+        if (existingIndex != -1) {
+            activeFileIndex = existingIndex
+        } else {
+            val success = openFileInternal(file)
+            if (success) activeFileIndex = openFiles.lastIndex
+        }
+    }
+
+    suspend fun cleanupNonExistentFilesSync() {
+        val existingFiles = openFiles.filter { state ->
+            val exists = state.file.exists() && state.file.isFile
+            if (!exists) withContext(KotlinDispatchers.IO) {
+                stateManager.removeFileFromCurrentProject(
+                    state.file.absolutePath
+                )
+            }
+            exists
+        }
+        if (existingFiles.size != openFiles.size) {
+            openFiles = existingFiles
+            if (activeFileIndex >= openFiles.size) activeFileIndex =
+                maxOf(0, openFiles.size - 1)
+        }
+    }
+
     // 编辑操作
     fun undo() =
         openFiles.getOrNull(activeFileIndex)?.let { editorInstances[it.file.absolutePath]?.undo() }

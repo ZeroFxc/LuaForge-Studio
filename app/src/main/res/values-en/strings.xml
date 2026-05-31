@@ -19,6 +19,16 @@
     <string name="more">More</string>
     <string name="create_project">Create project</string>
     <string name="import_source">Import source</string>
+    <string name="config_project_dir">Configure project directories</string>
+    <string name="config_project_dirs">Configure Project Directories</string>
+    <string name="add_dir">Add directory</string>
+    <string name="remove_dir">Remove directory</string>
+    <string name="primary_dir">Primary directory</string>
+    <string name="additional_dir">Additional directories</string>
+    <string name="default_project_dir">Default project directory</string>
+    <string name="select_project_dir">Select project directory</string>
+    <string name="file_picker_select_dir">Select Directory</string>
+    <string name="modify">Modify</string>
     <string name="share">Share</string>
     <string name="pin">Pin</string>
     <string name="unpin">Unpin</string>

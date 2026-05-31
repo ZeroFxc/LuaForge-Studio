@@ -18,6 +18,20 @@ object FileUtil {
     }
 
     /**
+     * 获取所有项目目录路径（主目录 + 附加目录）
+     */
+    fun getAllProjectPaths(context: Context): List<String> {
+        val settings = com.luaforge.studio.ui.settings.SettingsManager.currentSettings
+        val paths = mutableListOf<String>()
+        val primary = getProjectsPath(context)
+        if (primary.isNotBlank()) {
+            paths.add(primary)
+        }
+        paths.addAll(settings.additionalProjectPaths.filter { it.isNotBlank() })
+        return paths.distinct()
+    }
+
+    /**
      * 获取项目目录
      */
     fun getProjectsDirectory(context: Context): File {
