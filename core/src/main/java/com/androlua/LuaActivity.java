@@ -646,12 +646,12 @@ public class LuaActivity extends AppCompatActivity
     status = null;
 
     super.onDestroy();
-    System.gc();
     if (L != null) {
       L.gc(LuaState.LUA_GCCOLLECT, 1);
       L.close();
       L = null;
     }
+    System.gc();
   }
 
   @Override

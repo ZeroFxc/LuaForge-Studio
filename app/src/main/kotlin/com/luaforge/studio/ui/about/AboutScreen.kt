@@ -218,7 +218,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 description = "",
                 color = Color(0xFF36618E),
                 iconResId = R.drawable.ic_lua,
-                url = "https://www.lua.org"
+                url = "https://lxclua.星辰.online"
             ),
             Developer(
                 nameResId = R.string.dev_android_name,

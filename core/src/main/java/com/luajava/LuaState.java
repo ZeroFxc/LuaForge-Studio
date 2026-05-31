@@ -137,6 +137,7 @@ public class LuaState {
      * Closes state and removes the object from the LuaStateFactory
      */
     public synchronized void close() {
+        if (luaState == 0) return;
         LuaStateFactory.removeLuaState(luaState);
         _close(luaState);
         this.luaState = 0;
@@ -151,6 +152,7 @@ public class LuaState {
     @Override
     protected void finalize() {
         Log.i("luaState", "finalize: " + luaState);
+        if (luaState == 0) return;
         try {
             close();
         } catch (Exception e) {
