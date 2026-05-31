@@ -266,8 +266,6 @@ fun CodeEditScreen(
             )
 
             showEditorContent = true
-            delay(1800L)
-
             showInitialLoader = false
             viewModel.onInitialLoaderShown()
         }

@@ -52,16 +52,16 @@ android {
 
     signingConfigs {
         getByName("debug") {
-            keyAlias = "luaappxcore"
-            keyPassword = "luaappxcore"
-            storeFile = rootProject.file("debug.keystore")
-            storePassword = "luaappxcore"
+            keyAlias = "difierline"
+            keyPassword = "difierline"
+            storeFile = rootProject.file("difierline.jks")
+            storePassword = "difierline"
         }
         create("release") {
-            keyAlias = "luaappxcore"
-            keyPassword = "luaappxcore"
-            storeFile = rootProject.file("debug.keystore")
-            storePassword = "luaappxcore"
+            keyAlias = "difierline"
+            keyPassword = "difierline"
+            storeFile = rootProject.file("difierline.jks")
+            storePassword = "difierline"
         }
     }
 

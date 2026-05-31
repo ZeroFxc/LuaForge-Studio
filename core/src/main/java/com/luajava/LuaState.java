@@ -114,12 +114,13 @@ public class LuaState {
 
     private long luaState;
 
+    private final boolean mOwnsNativeState;
+
     //private long stateId;
 
     protected LuaState() {
         luaState = _newstate();
-        //openLuajava(stateId);
-        //this.stateId = luaState.getPeer();
+        mOwnsNativeState = true;
     }
 
     /**
@@ -129,8 +130,8 @@ public class LuaState {
      */
     protected LuaState(long luaState) {
         this.luaState = luaState;
+        this.mOwnsNativeState = false;
         LuaStateFactory.insertLuaState(this);
-        //openLuajava(stateId);
     }
 
     /**
@@ -139,7 +140,9 @@ public class LuaState {
     public synchronized void close() {
         if (luaState == 0) return;
         LuaStateFactory.removeLuaState(luaState);
-        _close(luaState);
+        if (mOwnsNativeState) {
+            _close(luaState);
+        }
         this.luaState = 0;
         javaObjectGcList.clear();
         javaObjectMap.clear();
@@ -152,7 +155,7 @@ public class LuaState {
     @Override
     protected void finalize() {
         Log.i("luaState", "finalize: " + luaState);
-        if (luaState == 0) return;
+        if (!mOwnsNativeState || luaState == 0) return;
         try {
             close();
         } catch (Exception e) {

@@ -204,7 +204,6 @@ public class LuaAsyncTask extends AsyncTaskX implements LuaGcable {
         }
         if (L != null)
             L.gc(LuaState.LUA_GCCOLLECT, 1);
-        System.gc();
         //L.close();
     }
 
