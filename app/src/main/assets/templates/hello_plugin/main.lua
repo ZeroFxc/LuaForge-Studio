@@ -21,6 +21,9 @@
 -- plugin.mainpage: 主页项目列表操作（多选模式、徽章、自定义菜单、滑动事件）
 -- plugin.settings: 设置页面扩展
 -- plugin.detail:  插件详情展开区扩展
+-- plugin.logger:  日志系统（记录/读取/搜索/跨插件日志访问）
+-- plugin.assets:  资源注册表（注册/查询/读取跨插件共享资源）
+-- plugin.shortcut: 快捷键绑定（注册/查询/冲突检测）
 --
 -- 新增主页项目列表事件:
 --   onProjectLongPress(projectId, projectName, projectPath)  -- 项目长按
@@ -744,3 +747,459 @@ plugin.menu.addQuickAction("single_choice_demo", "单选对话框", function()
 end)
 
 plugin.sys.log("示例插件", "初始化完成，已注册 26 个快捷操作 + 3 个菜单项 + 5 个侧滑栏项 + 2 个 section / 6 个关于项 + 2 个事件监听器 + 2 个底部面板")
+
+-- ============================================================
+-- 新增: 日志系统 API 演示 (plugin.logger)
+-- ============================================================
+
+-- 51. 记录不同级别的日志
+plugin.menu.addQuickAction("log_levels", "日志级别演示", function()
+    plugin.logger.debug("示例插件", "这是一条 DEBUG 日志")
+    plugin.logger.info("示例插件", "这是一条 INFO 日志")
+    plugin.logger.warn("示例插件", "这是一条 WARN 日志")
+    plugin.logger.error("示例插件", "这是一条 ERROR 日志", "模拟异常信息")
+    plugin.sys.toast("已记录 4 条不同级别的日志")
+end)
+
+-- 52. 查看自己的日志文件列表
+plugin.menu.addQuickAction("log_list_files", "查看日志文件", function()
+    local files = plugin.logger.listLogFiles()
+    local logDir = plugin.logger.getLogDir()
+    local info = "日志目录: " .. logDir .. "\n\n"
+    if files and #files > 0 then
+        info = info .. "日志文件列表:\n"
+        for i, name in ipairs(files) do
+            local size = plugin.logger.getLogFileSize(name)
+            info = info .. i .. ". " .. name .. " (" .. size .. " 字节)\n"
+        end
+    else
+        info = info .. "暂无日志文件"
+    end
+    plugin.ui.showMessage("日志文件", info)
+end)
+
+-- 53. 查看最新日志
+plugin.menu.addQuickAction("log_latest", "查看最新日志", function()
+    local content = plugin.logger.getLatestLog()
+    if content and #content > 0 then
+        plugin.ui.showTextDialog("最新日志", content)
+    else
+        plugin.sys.toast("暂无日志内容")
+    end
+end)
+
+-- 54. 搜索日志
+plugin.menu.addQuickAction("log_search", "搜索日志", function()
+    plugin.ui.showInputDialog("搜索日志", "输入关键词", "ERROR", {
+        onInput = function(keyword)
+            local results = plugin.logger.searchLogs(keyword, 20)
+            if results and #results > 0 then
+                local info = "搜索关键词: " .. keyword .. "\n" ..
+                             "匹配条数: " .. #results .. "\n\n"
+                for i, entry in ipairs(results) do
+                    info = info .. "[" .. entry.timestamp .. "] [" .. entry.level .. "] " .. entry.message .. "\n"
+                end
+                plugin.ui.showTextDialog("搜索结果", info)
+            else
+                plugin.sys.toast("未找到匹配日志")
+            end
+        end
+    })
+end)
+
+-- 55. 查看日志统计
+plugin.menu.addQuickAction("log_stats", "日志统计", function()
+    local lineCount = plugin.logger.getLogLineCount()
+    local files = plugin.logger.listLogFiles()
+    local totalSize = 0
+    for _, name in ipairs(files) do
+        totalSize = totalSize + plugin.logger.getLogFileSize(name)
+    end
+    local info = "日志文件数: " .. #files .. "\n" ..
+                 "日志总行数: " .. lineCount .. "\n" ..
+                 "日志总大小: " .. totalSize .. " 字节\n" ..
+                 "日志目录: " .. plugin.logger.getLogDir()
+    plugin.ui.showMessage("日志统计", info)
+end)
+
+-- 56. 清空日志
+plugin.menu.addQuickAction("log_clear", "清空日志", function()
+    plugin.ui.showConfirm("清空日志", "确定要清空所有日志文件吗？", function()
+        local ok = plugin.logger.clearLogs()
+        plugin.sys.toast(ok and "日志已清空" or "清空日志失败")
+    end, nil)
+end)
+
+-- 57. 跨插件日志访问 - 查看其他插件日志（演示用）
+plugin.menu.addQuickAction("log_other_plugin", "查看其他插件日志", function()
+    local plugins = plugin.manager.getPluginIds()
+    local items = {}
+    local otherPlugins = {}
+    for i, pid in ipairs(plugins) do
+        if pid ~= plugin.getPluginId() then
+            table.insert(items, plugin.manager.getPluginName(pid) or pid)
+            table.insert(otherPlugins, pid)
+        end
+    end
+    
+    if #items == 0 then
+        plugin.sys.toast("没有其他插件")
+        return
+    end
+    
+    plugin.ui.showSingleChoiceDialog("选择要查看日志的插件", items, 0, {
+        onSelect = function(index)
+            local targetId = otherPlugins[index + 1]
+            local files = plugin.logger.listPluginLogFiles(targetId)
+            local logDir = plugin.logger.getPluginLogDir(targetId)
+            
+            if files and #files > 0 then
+                local content = plugin.logger.readPluginLogFile(targetId, files[1])
+                local info = "插件: " .. (plugin.manager.getPluginName(targetId) or targetId) .. "\n" ..
+                             "日志文件: " .. files[1] .. "\n" ..
+                             "行数: " .. plugin.logger.getPluginLogLineCount(targetId) .. "\n\n" ..
+                             content
+                plugin.ui.showTextDialog("插件日志", info)
+            else
+                plugin.sys.toast("该插件暂无日志: " .. logDir)
+            end
+        end
+    })
+end)
+
+-- ============================================================
+-- 新增: 资源注册表 API 演示 (plugin.assets)
+-- ============================================================
+
+-- 58. 注册资源演示
+plugin.menu.addQuickAction("asset_register", "注册一个资源", function()
+    local projectPath = plugin.project.getPath()
+    if not projectPath then
+        plugin.sys.toast("请先打开一个项目")
+        return
+    end
+    
+    local testFile = projectPath .. "/main.lua"
+    local file = io.open(testFile, "r")
+    if not file then
+        plugin.sys.toast("项目根目录未找到 main.lua")
+        return
+    end
+    file:close()
+    
+    local meta = {
+        version = "1.0",
+        encoding = "utf-8"
+    }
+    
+    local globalId = plugin.assets.registerAsset(
+        "demo_entry",           -- key
+        "data",                 -- type
+        testFile,               -- filePath
+        "演示入口文件",           -- displayName
+        "这是演示插件的 main.lua 入口文件", -- description
+        true,                   -- isPublic (其他插件可访问)
+        meta                    -- metadata
+    )
+    
+    if globalId then
+        plugin.sys.toast("资源注册成功: " .. globalId)
+    else
+        plugin.sys.toast("资源注册失败，文件不存在")
+    end
+end)
+
+-- 59. 查看自己注册的资源
+plugin.menu.addQuickAction("asset_list_my", "查看我的资源", function()
+    local assets = plugin.assets.getMyAssets()
+    if assets and #assets > 0 then
+        local info = "我的注册资源 (" .. #assets .. " 个):\n\n"
+        for i, asset in ipairs(assets) do
+            info = info .. asset.id .. "\n"
+            info = info .. "  类型: " .. asset.type .. "\n"
+            info = info .. "  名称: " .. asset.displayName .. "\n"
+            info = info .. "  大小: " .. asset.size .. " 字节\n"
+            info = info .. "  公开: " .. (asset.isPublic and "是" or "否") .. "\n\n"
+        end
+        plugin.ui.showTextDialog("我的资源", info)
+    else
+        plugin.sys.toast("你没有注册任何资源，先点击「注册一个资源」试试")
+    end
+end)
+
+-- 60. 查看所有公开资源
+plugin.menu.addQuickAction("asset_list_all", "查看所有公开资源", function()
+    local assets = plugin.assets.getAllPublicAssets()
+    local total = plugin.assets.getTotalAssetCount()
+    if assets and #assets > 0 then
+        local info = "全局公开资源: " .. #assets .. " / " .. total .. " 个\n\n"
+        for i, asset in ipairs(assets) do
+            info = info .. asset.id .. " [" .. asset.type .. "] " .. asset.displayName .. "\n"
+        end
+        plugin.ui.showTextDialog("公开资源列表", info)
+    else
+        plugin.sys.toast("暂无公开资源，总计: " .. total .. " 个")
+    end
+end)
+
+-- 61. 按类型筛选资源
+plugin.menu.addQuickAction("asset_filter_type", "按类型筛选资源", function()
+    local types = {"image", "audio", "font", "data", "layout", "icon", "raw"}
+    plugin.ui.showSingleChoiceDialog("选择资源类型", types, 0, {
+        onSelect = function(index)
+            local selType = types[index + 1]
+            local assets = plugin.assets.getAssetsByType(selType)
+            local count = plugin.assets.getAssetCountByType(selType)
+            if assets and #assets > 0 then
+                local info = selType .. " 类型资源: " .. #assets .. " 个（共 " .. count .. " 个）\n\n"
+                for i, asset in ipairs(assets) do
+                    info = info .. i .. ". " .. asset.id .. " - " .. asset.displayName .. "\n"
+                end
+                plugin.ui.showTextDialog("类型筛选: " .. selType, info)
+            else
+                plugin.sys.toast("没有 " .. selType .. " 类型的资源（共 " .. count .. " 个）")
+            end
+        end
+    })
+end)
+
+-- 62. 读取资源内容
+plugin.menu.addQuickAction("asset_read", "读取资源内容", function()
+    local assets = plugin.assets.getMyAssets()
+    if not assets or #assets == 0 then
+        plugin.sys.toast("请先注册一个资源")
+        return
+    end
+    
+    local items = {}
+    for i, asset in ipairs(assets) do
+        table.insert(items, asset.id .. " (" .. asset.type .. ")")
+    end
+    
+    plugin.ui.showSingleChoiceDialog("选择要读取的资源", items, 0, {
+        onSelect = function(index)
+            local asset = assets[index + 1]
+            local exists = plugin.assets.assetExists(asset.id)
+            if not exists then
+                plugin.sys.toast("资源文件不存在: " .. asset.filePath)
+                return
+            end
+            
+            local text = plugin.assets.readAssetText(asset.id)
+            if text then
+                local preview = text:sub(1, 500)
+                if #text > 500 then preview = preview .. "\n\n... (内容已截断)" end
+                plugin.ui.showTextDialog("资源: " .. asset.id, preview)
+            else
+                plugin.sys.toast("读取资源失败（可能是二进制文件）")
+            end
+        end
+    })
+end)
+
+-- 63. 注销资源
+plugin.menu.addQuickAction("asset_unregister", "注销资源", function()
+    local assets = plugin.assets.getMyAssets()
+    if not assets or #assets == 0 then
+        plugin.sys.toast("没有可注销的资源")
+        return
+    end
+    
+    local items = {}
+    for i, asset in ipairs(assets) do
+        table.insert(items, asset.id .. " - " .. asset.displayName)
+    end
+    
+    plugin.ui.showSingleChoiceDialog("选择要注销的资源", items, 0, {
+        onSelect = function(index)
+            local asset = assets[index + 1]
+            local ok = plugin.assets.unregisterAsset(asset.key)
+            plugin.sys.toast(ok and "已注销: " .. asset.id or "注销失败")
+        end
+    })
+end)
+
+-- 64. 注销全部资源
+plugin.menu.addQuickAction("asset_unregister_all", "注销全部资源", function()
+    local count = plugin.assets.getMyAssets()
+    local n = count and #count or 0
+    if n == 0 then
+        plugin.sys.toast("没有可注销的资源")
+        return
+    end
+    plugin.ui.showConfirm("注销全部资源", "确定要注销全部 " .. n .. " 个资源吗？", function()
+        local removed = plugin.assets.unregisterAllAssets()
+        plugin.sys.toast("已注销 " .. removed .. " 个资源")
+    end, nil)
+end)
+
+plugin.sys.log("示例插件", "初始化完成，已注册 26 + 14 + 9 个快捷操作 + 3 个菜单项 + 5 个侧滑栏项 + 2 个 section / 6 个关于项 + 2 个事件监听器 + 2 个底部面板 + 3 个快捷键 + 5 个快捷键管理菜单")
+
+-- ============================================================
+-- 新增: 快捷键绑定系统 API 演示 (plugin.shortcut)
+-- ============================================================
+
+-- 65. 注册一个快捷键: Ctrl+Shift+F → 格式化代码
+local fmtRegistered = plugin.shortcut.register(
+    "format_code",
+    "Ctrl+Shift+F",
+    "格式化代码",
+    "按下 Ctrl+Shift+F 格式化当前文件",
+    function(combo)
+        plugin.sys.toast("快捷键触发: " .. combo .. " → 格式化代码")
+        plugin.editor.saveActiveFile()
+    end,
+    true
+)
+if fmtRegistered then
+    plugin.sys.log("示例插件", "快捷键注册成功: " .. fmtRegistered)
+else
+    plugin.sys.log("示例插件", "快捷键注册失败: Ctrl+Shift+F")
+end
+
+-- 66. 注册快捷键: Ctrl+D → 复制当前行
+plugin.shortcut.register(
+    "duplicate_line",
+    "Ctrl+D",
+    "复制当前行",
+    function(combo)
+        local text = plugin.editor.getSelectedText()
+        if text and #text > 0 then
+            plugin.editor.insertText(text)
+            plugin.sys.toast("已复制选中文本")
+        else
+            plugin.sys.toast("请先选中文本再按 Ctrl+D")
+        end
+    end,
+    true
+)
+
+-- 67. 注册快捷键: Alt+G → 跳转到行
+plugin.shortcut.register(
+    "goto_line_shortcut",
+    "Alt+G",
+    "跳转到行",
+    function(combo)
+        plugin.ui.showInputDialog("跳转到行", "请输入行号", "1", {
+            onInput = function(text)
+                local line = tonumber(text)
+                if line then
+                    plugin.editor.gotoLine(line - 1)
+                    plugin.sys.toast("已跳转到第 " .. line .. " 行")
+                end
+            end
+        })
+    end,
+    true
+)
+
+-- 68. 添加查看快捷键列表的菜单
+plugin.menu.addQuickAction("shortcut_list", "查看快捷键列表", function()
+    local shortcuts = plugin.shortcut.getMyShortcuts()
+    local allCount = plugin.shortcut.getShortcutCount()
+    if shortcuts and #shortcuts > 0 then
+        local info = "我的快捷键: " .. #shortcuts .. " 个（全局共 " .. allCount .. " 个）\n\n"
+        for i, sc in ipairs(shortcuts) do
+            info = info .. i .. ". " .. sc.combination .. " → " .. sc.label .. "\n"
+            if sc.description ~= "" then
+                info = info .. "   描述: " .. sc.description .. "\n"
+            end
+            info = info .. "   仅编辑器: " .. (sc.editorOnly and "是" or "否") .. "\n\n"
+        end
+        plugin.ui.showMessage("我的快捷键", info)
+    else
+        plugin.sys.toast("未注册任何快捷键")
+    end
+end)
+
+-- 69. 添加查看全部快捷键（含冲突检测）的菜单
+plugin.menu.addQuickAction("shortcut_all", "查看全部快捷键", function()
+    local all = plugin.shortcut.getAllShortcuts()
+    local count = plugin.shortcut.getShortcutCount()
+    if all and #all > 0 then
+        local info = "全部快捷键 (" .. count .. " 个):\n\n"
+        for i, sc in ipairs(all) do
+            info = info .. i .. ". [" .. sc.pluginId .. "] " .. sc.combination .. " → " .. sc.label .. "\n"
+        end
+        plugin.ui.showTextDialog("全部快捷键", info)
+    else
+        plugin.sys.toast("暂无快捷键")
+    end
+end)
+
+-- 70. 检测快捷键冲突
+plugin.menu.addQuickAction("shortcut_conflict", "检测快捷键冲突", function()
+    plugin.ui.showInputDialog("检测快捷键冲突", "输入组合键", "Ctrl+S", {
+        onInput = function(text)
+            local taken = plugin.shortcut.isCombinationTaken(text)
+            if taken then
+                plugin.ui.showMessage("冲突检测结果",
+                    "组合键 " .. text .. " 已被占用:\n\n" ..
+                    "注册者: " .. taken.pluginId .. "\n" ..
+                    "用途: " .. taken.label .. "\n" ..
+                    "ID: " .. taken.id)
+            else
+                plugin.sys.toast("组合键 " .. text .. " 未被占用")
+            end
+        end
+    })
+end)
+
+-- 71. 注销指定快捷键
+plugin.menu.addQuickAction("shortcut_unregister", "注销快捷键", function()
+    local shortcuts = plugin.shortcut.getMyShortcuts()
+    if not shortcuts or #shortcuts == 0 then
+        plugin.sys.toast("没有可注销的快捷键")
+        return
+    end
+    
+    local items = {}
+    for i, sc in ipairs(shortcuts) do
+        table.insert(items, sc.combination .. " - " .. sc.label)
+    end
+    
+    plugin.ui.showSingleChoiceDialog("选择要注销的快捷键", items, 0, {
+        onSelect = function(index)
+            local sc = shortcuts[index + 1]
+            local ok = plugin.shortcut.unregister(sc.key)
+            plugin.sys.toast(ok and "已注销: " .. sc.combination or "注销失败")
+        end
+    })
+end)
+
+-- 72. 注销全部快捷键
+plugin.menu.addQuickAction("shortcut_unregister_all", "注销全部快捷键", function()
+    local shortcuts = plugin.shortcut.getMyShortcuts()
+    local n = shortcuts and #shortcuts or 0
+    if n == 0 then
+        plugin.sys.toast("没有可注销的快捷键")
+        return
+    end
+    plugin.ui.showConfirm("注销全部快捷键", "确定要注销全部 " .. n .. " 个快捷键吗？", function()
+        local removed = plugin.shortcut.unregisterAll()
+        plugin.sys.toast("已注销 " .. removed .. " 个快捷键")
+    end, nil)
+end)
+
+-- 73. 重新注册演示快捷键
+plugin.menu.addQuickAction("shortcut_reregister", "重新注册快捷键", function()
+    plugin.shortcut.unregisterAll()
+    
+    local a = plugin.shortcut.register("format_code", "Ctrl+Shift+F", "格式化代码", "格式化当前文件", function(combo)
+        plugin.sys.toast("格式化触发!")
+    end, true)
+    
+    local b = plugin.shortcut.register("duplicate_line", "Ctrl+D", "复制当前行", function(combo)
+        plugin.sys.toast("复制触发!")
+    end, true)
+    
+    local c = plugin.shortcut.register("goto_line_shortcut", "Alt+G", "跳转到行", function(combo)
+        plugin.sys.toast("跳转触发!")
+    end, true)
+    
+    local count = 0
+    if a then count = count + 1 end
+    if b then count = count + 1 end
+    if c then count = count + 1 end
+    plugin.sys.toast("已重新注册 " .. count .. " 个快捷键")
+end)

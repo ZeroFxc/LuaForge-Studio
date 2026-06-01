@@ -9,6 +9,8 @@ import com.luaforge.studio.lxclua.plugin.PluginManager
 import com.luaforge.studio.lxclua.plugin.api.IPluginBridge
 import com.luaforge.studio.lxclua.plugin.api.callbacks.*
 import com.luaforge.studio.lxclua.plugin.data.FileInfo
+import com.luaforge.studio.lxclua.plugin.data.RegisteredResource
+import com.luaforge.studio.lxclua.plugin.data.ShortcutInfo
 import com.luaforge.studio.lxclua.plugin.state.EventManager
 import com.luaforge.studio.lxclua.plugin.state.UIState
 import com.luaforge.studio.lxclua.ui.editor.QuickAction
@@ -39,6 +41,18 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
     
     private val pluginPrefs by lazy {
         PluginManager.appContext?.getSharedPreferences("plugin_prefs_$pluginId", Context.MODE_PRIVATE)!!
+    }
+    
+    private val loggerBridge by lazy {
+        PluginLogger(PluginManager.appContext!!, pluginId)
+    }
+    
+    private val resourceRegistry by lazy {
+        PluginResourceRegistry(pluginId)
+    }
+    
+    private val shortcutBridge by lazy {
+        PluginShortcut(pluginId)
     }
     
     // ==================== 基础功能 ====================
@@ -955,5 +969,186 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
         } catch (e: Exception) {
             null
         }
+    }
+    
+    // ==================== 日志系统 ====================
+    
+    override fun debug(tag: String, message: String) {
+        loggerBridge.debug(tag, message)
+    }
+    
+    override fun info(tag: String, message: String) {
+        loggerBridge.info(tag, message)
+    }
+    
+    override fun warn(tag: String, message: String) {
+        loggerBridge.warn(tag, message)
+    }
+    
+    override fun error(tag: String, message: String, error: String?) {
+        loggerBridge.error(tag, message, error)
+    }
+    
+    override fun getLogDir(): String {
+        return loggerBridge.getLogDir()
+    }
+    
+    override fun listLogFiles(): Array<String> {
+        return loggerBridge.listLogFiles()
+    }
+    
+    override fun readLogFile(filename: String): String {
+        return loggerBridge.readLogFile(filename)
+    }
+    
+    override fun getLatestLog(): String {
+        return loggerBridge.getLatestLog()
+    }
+    
+    override fun getLogFileSize(filename: String): Long {
+        return loggerBridge.getLogFileSize(filename)
+    }
+    
+    override fun clearLogs(): Boolean {
+        return loggerBridge.clearLogs()
+    }
+    
+    override fun getPluginLogDir(pluginId: String): String {
+        return loggerBridge.getPluginLogDir(pluginId)
+    }
+    
+    override fun listPluginLogFiles(pluginId: String): Array<String> {
+        return loggerBridge.listPluginLogFiles(pluginId)
+    }
+    
+    override fun readPluginLogFile(pluginId: String, filename: String): String {
+        return loggerBridge.readPluginLogFile(pluginId, filename)
+    }
+    
+    override fun getPluginLatestLog(pluginId: String): String {
+        return loggerBridge.getPluginLatestLog(pluginId)
+    }
+    
+    override fun searchLogs(keyword: String, maxResults: Int): Array<LogEntry> {
+        return loggerBridge.searchLogs(keyword, maxResults)
+    }
+    
+    override fun searchPluginLogs(pluginId: String, keyword: String, maxResults: Int): Array<LogEntry> {
+        return loggerBridge.searchPluginLogs(pluginId, keyword, maxResults)
+    }
+    
+    override fun getLogLineCount(): Int {
+        return loggerBridge.getLogLineCount()
+    }
+    
+    override fun getPluginLogLineCount(pluginId: String): Int {
+        return loggerBridge.getPluginLogLineCount(pluginId)
+    }
+    
+    // ==================== 资源注册表 ====================
+    
+    override fun registerAsset(
+        key: String,
+        type: String,
+        filePath: String,
+        displayName: String,
+        description: String,
+        isPublic: Boolean,
+        metadata: Map<String, String>?
+    ): String? {
+        return resourceRegistry.registerAsset(key, type, filePath, displayName, description, isPublic, metadata)
+    }
+    
+    override fun unregisterAsset(key: String): Boolean {
+        return resourceRegistry.unregisterAsset(key)
+    }
+    
+    override fun unregisterAllAssets(): Int {
+        return resourceRegistry.unregisterAllAssets()
+    }
+    
+    override fun getMyAssets(): Array<RegisteredResource> {
+        return resourceRegistry.getMyAssets()
+    }
+    
+    override fun getAsset(globalId: String): RegisteredResource? {
+        return resourceRegistry.getAsset(globalId)
+    }
+    
+    override fun getAllPublicAssets(): Array<RegisteredResource> {
+        return resourceRegistry.getAllPublicAssets()
+    }
+    
+    override fun getAssetsByType(type: String): Array<RegisteredResource> {
+        return resourceRegistry.getAssetsByType(type)
+    }
+    
+    override fun getPluginAssets(pluginId: String): Array<RegisteredResource> {
+        return resourceRegistry.getPluginAssets(pluginId)
+    }
+    
+    override fun readAssetBytes(globalId: String): ByteArray? {
+        return resourceRegistry.readAssetBytes(globalId)
+    }
+    
+    override fun readAssetText(globalId: String): String? {
+        return resourceRegistry.readAssetText(globalId)
+    }
+    
+    override fun assetExists(globalId: String): Boolean {
+        return resourceRegistry.assetExists(globalId)
+    }
+    
+    override fun getTotalAssetCount(): Int {
+        return resourceRegistry.getTotalAssetCount()
+    }
+    
+    override fun getAssetCountByType(type: String): Int {
+        return resourceRegistry.getAssetCountByType(type)
+    }
+    
+    // ==================== 快捷键绑定 ====================
+    
+    override fun register(
+        key: String,
+        combination: String,
+        label: String,
+        description: String,
+        callback: Any,
+        editorOnly: Boolean
+    ): String? {
+        return shortcutBridge.register(key, combination, label, description, callback, editorOnly)
+    }
+    
+    override fun register(key: String, combination: String, label: String, callback: Any): String? {
+        return shortcutBridge.register(key, combination, label, callback)
+    }
+    
+    override fun unregister(key: String): Boolean {
+        return shortcutBridge.unregister(key)
+    }
+    
+    override fun unregisterAll(): Int {
+        return shortcutBridge.unregisterAll()
+    }
+    
+    override fun getMyShortcuts(): Array<ShortcutInfo> {
+        return shortcutBridge.getMyShortcuts()
+    }
+    
+    override fun getShortcut(globalId: String): ShortcutInfo? {
+        return shortcutBridge.getShortcut(globalId)
+    }
+    
+    override fun getAllShortcuts(): Array<ShortcutInfo> {
+        return shortcutBridge.getAllShortcuts()
+    }
+    
+    override fun isCombinationTaken(combination: String): ShortcutInfo? {
+        return shortcutBridge.isCombinationTaken(combination)
+    }
+    
+    override fun getShortcutCount(): Int {
+        return shortcutBridge.getShortcutCount()
     }
 }

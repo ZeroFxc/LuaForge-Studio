@@ -18,7 +18,10 @@ interface IPluginBridge :
     IPluginBridgeReflection,
     IPluginBridgeDex,
     IPluginBridgeResources,
-    IPluginBridgeLua {
+    IPluginBridgeLua,
+    IPluginBridgeLogger,
+    IPluginBridgeResourceRegistry,
+    IPluginBridgeShortcut {
     
     // ==================== 基础功能 ====================
     

@@ -1003,7 +1003,6 @@ fun MainScreen(
                                 currentSettings = currentSettings,
                                 onSettingsChanged = { newSettings ->
                                     settingsManager.updateSettings(newSettings)
-                                    settingsManager.saveSettings(context)
                                 },
                                 toast = toast
                             )

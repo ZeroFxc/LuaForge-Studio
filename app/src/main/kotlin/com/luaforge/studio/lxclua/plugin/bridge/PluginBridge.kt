@@ -24,6 +24,9 @@ import java.io.File
  * - plugin.manager: 插件管理
  * - plugin.nav: 导航与侧滑栏
  * - plugin.about: 关于页面扩展（添加 section、链接、回调、信息项）
+ * - plugin.logger: 日志系统（记录/读取/搜索自己及他插件的日志）
+ * - plugin.assets: 资源注册表（注册/查询/读取跨插件共享资源）
+ * - plugin.shortcut: 快捷键绑定（注册/查询/冲突检测）
  */
 class PluginBridge(private val context: Context, private val pluginId: String) {
     
@@ -79,6 +82,15 @@ class PluginBridge(private val context: Context, private val pluginId: String) {
     
     /** 插件详情展开区扩展 API */
     val detail = PluginDetailBridge(pluginId)
+    
+    /** 日志系统 API */
+    val logger = PluginLogger(context, pluginId)
+    
+    /** 资源注册表 API */
+    val assets = PluginResourceRegistry(pluginId)
+    
+    /** 快捷键绑定 API */
+    val shortcut = PluginShortcut(pluginId)
     
     // ============ 版本信息 ============
     

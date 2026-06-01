@@ -28,6 +28,7 @@ import com.luaforge.studio.lxclua.ui.theme.ThemeType
 import com.luaforge.studio.lxclua.utils.IconManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.File
@@ -102,6 +103,12 @@ enum class ToastPosition {
 }
 
 object SettingsManager {
+
+    private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Volatile
+    var settingsLoaded = false
+        private set
 
     // 当前设置状态
     var currentSettings by mutableStateOf(SettingsData())
@@ -273,10 +280,14 @@ object SettingsManager {
                 enableSwipeGesture = enableSwipeGesture  // 【新增】
             )
         )
+        settingsLoaded = true
     }
 
     // 异步保存设置到 DataStore
     suspend fun saveSettingsAsync(context: Context) {
+        if (!settingsLoaded) {
+            return
+        }
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.THEME_TYPE] = currentSettings.themeType.name
             preferences[PreferencesKeys.DARK_MODE] = currentSettings.darkMode.name
@@ -336,7 +347,10 @@ object SettingsManager {
 
     // 保存设置（在后台协程中执行）
     fun saveSettings(context: Context) {
-        CoroutineScope(Dispatchers.IO).launch {
+        if (!settingsLoaded) {
+            return
+        }
+        saveScope.launch {
             saveSettingsAsync(context)
         }
     }
@@ -375,9 +389,11 @@ object SettingsManager {
         updateSettings(newSettings)
 
         // 异步保存到 DataStore
-        CoroutineScope(Dispatchers.IO).launch {
-            context.dataStore.edit { preferences ->
-                preferences[PreferencesKeys.LANGUAGE_TAG] = languageTag
+        if (settingsLoaded) {
+            saveScope.launch {
+                context.dataStore.edit { preferences ->
+                    preferences[PreferencesKeys.LANGUAGE_TAG] = languageTag
+                }
             }
         }
 

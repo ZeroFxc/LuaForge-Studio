@@ -424,6 +424,12 @@ object PluginManager {
         if (bottomPanelItems.none { it.key == activeBottomPanelKey.value }) {
             activeBottomPanelKey.value = bottomPanelItems.firstOrNull()?.key
         }
+        
+        // 移除注册的资源
+        com.luaforge.studio.lxclua.plugin.bridge.PluginResourceRegistry.removeAllPluginAssets(pluginId)
+        
+        // 移除注册的快捷键
+        com.luaforge.studio.lxclua.plugin.bridge.PluginShortcut.removeAllPluginShortcuts(pluginId)
     }
     
     /**

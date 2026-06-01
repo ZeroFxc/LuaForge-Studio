@@ -1,0 +1,16 @@
+{
+  "id": "com.example.new_api_demo",
+  "name": "新API演示插件",
+  "version": "1.0.0",
+  "description": "演示 plugin.logger / plugin.assets / plugin.shortcut 三大新 API 的用法",
+  "author": "DifierLine",
+  "type": "lua",
+  "pluginType": "normal",
+  "main": "main.lua",
+  "apiVersion": 1,
+  "category": "demo",
+  "homepage": null,
+  "icon": null,
+  "dependencies": [],
+  "extendedBy": []
+}
