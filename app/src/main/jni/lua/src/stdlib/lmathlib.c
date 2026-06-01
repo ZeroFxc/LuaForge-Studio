@@ -563,37 +563,49 @@ static lua_Unsigned project (lua_Unsigned ran, lua_Unsigned n,
 
 
 static int math_random (lua_State *L) {
-  lua_Integer low, up;
-  lua_Unsigned p;
   RanState *state = (RanState *)lua_touserdata(L, lua_upvalueindex(1));
-  Rand64 rv = nextrand(state->s);  /* next pseudo-random value */
-  switch (lua_gettop(L)) {  /* check number of arguments */
-    case 0: {  /* no arguments */
-      lua_pushnumber(L, I2d(rv));  /* float between 0 and 1 */
+  Rand64 rv = nextrand(state->s);
+  switch (lua_gettop(L)) {
+    case 0: {
+      lua_pushnumber(L, I2d(rv));
       return 1;
     }
-    case 1: {  /* only upper limit */
-      low = 1;
-      up = luaL_checkinteger(L, 1);
-      if (up == 0) {  /* single 0 as argument? */
-        lua_pushinteger(L, l_castU2S(I2UInt(rv)));  /* full random integer */
-        return 1;
+    case 1: {
+      if (lua_isinteger(L, 1)) {
+        lua_Integer up = lua_tointeger(L, 1);
+        if (up == 0) {
+          lua_pushinteger(L, l_castU2S(I2UInt(rv)));
+          return 1;
+        }
+        luaL_argcheck(L, up >= 1, 1, "interval is empty");
+        lua_Unsigned p = project(I2UInt(rv), (lua_Unsigned)up - 1, state);
+        lua_pushinteger(L, (lua_Integer)(p + 1));
+      } else {
+        lua_Number up = luaL_checknumber(L, 1);
+        luaL_argcheck(L, up >= 1.0, 1, "interval is empty");
+        lua_Number r = I2d(rv);
+        lua_pushnumber(L, r * up);
       }
-      break;
+      return 1;
     }
-    case 2: {  /* lower and upper limits */
-      low = luaL_checkinteger(L, 1);
-      up = luaL_checkinteger(L, 2);
-      break;
+    case 2: {
+      if (lua_isinteger(L, 1) && lua_isinteger(L, 2)) {
+        lua_Integer low = lua_tointeger(L, 1);
+        lua_Integer up = lua_tointeger(L, 2);
+        luaL_argcheck(L, low <= up, 1, "interval is empty");
+        lua_Unsigned p = project(I2UInt(rv), (lua_Unsigned)up - (lua_Unsigned)low, state);
+        lua_pushinteger(L, (lua_Integer)(p + (lua_Unsigned)low));
+      } else {
+        lua_Number low = luaL_checknumber(L, 1);
+        lua_Number up = luaL_checknumber(L, 2);
+        luaL_argcheck(L, low <= up, 1, "interval is empty");
+        lua_Number r = I2d(rv);
+        lua_pushnumber(L, low + r * (up - low));
+      }
+      return 1;
     }
     default: return luaL_error(L, "wrong number of arguments");
   }
-  /* random integer in the interval [low, up] */
-  luaL_argcheck(L, low <= up, 1, "interval is empty");
-  /* project random integer into the interval [0, up - low] */
-  p = project(I2UInt(rv), l_castS2U(up) - l_castS2U(low), state);
-  lua_pushinteger(L, l_castU2S(p + l_castS2U(low)));
-  return 1;
 }
 
 

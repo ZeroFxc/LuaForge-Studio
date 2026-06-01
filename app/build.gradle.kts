@@ -124,7 +124,6 @@ android {
         jniLibs {
             useLegacyPackaging = true
             excludes += listOf(
-                "**/libc++_shared.so",
                 "**/libc++_static.a",
                 "**/*.a"
             )
