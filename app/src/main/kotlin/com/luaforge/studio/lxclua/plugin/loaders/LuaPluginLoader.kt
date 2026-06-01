@@ -2,7 +2,7 @@ package com.luaforge.studio.lxclua.plugin.loaders
 
 import android.content.Context
 import com.luaforge.studio.lxclua.plugin.LoadedPlugin
-import com.luaforge.studio.lxclua.plugin.bridge.PluginBridgeImpl
+import com.luaforge.studio.lxclua.plugin.bridge.PluginBridge
 import com.luaforge.studio.lxclua.plugin.state.EventManager
 import com.luaforge.studio.lxclua.plugin.state.PluginEvents
 import com.luajava.LuaState
@@ -11,6 +11,19 @@ import java.io.File
 
 /**
  * Lua 插件加载器
+ * 
+ * 提供分类化的 API 访问方式：
+ * - plugin.sys: 系统操作
+ * - plugin.editor: 编辑器操作
+ * - plugin.project: 项目操作
+ * - plugin.ui: 对话框操作
+ * - plugin.events: 事件监听
+ * - plugin.config: 配置存储
+ * - plugin.reflect: Java 反射
+ * - plugin.lua: Lua 脚本执行
+ * - plugin.menu: 菜单管理
+ * - plugin.clipboard: 剪贴板操作
+ * - plugin.http: 网络请求
  */
 object LuaPluginLoader {
     
@@ -19,10 +32,10 @@ object LuaPluginLoader {
         val L = LuaStateFactory.newLuaState()
         L.openLibs()
         
-        // 2. 绑定全局 studio 桥梁对象
-        val bridge = PluginBridgeImpl(plugin.manifest.id)
+        // 2. 创建 PluginBridge 对象（分类化 API）
+        val bridge = PluginBridge(context, plugin.manifest.id)
         L.pushJavaObject(bridge)
-        L.setGlobal("studio")
+        L.setGlobal("plugin")
         
         // 3. 执行主入口脚本
         val mainFile = File(plugin.directory, plugin.manifest.main)

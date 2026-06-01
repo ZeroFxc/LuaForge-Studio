@@ -211,8 +211,9 @@ object PluginManager {
      */
     fun checkDependencies(plugin: LoadedPlugin): Pair<Boolean, String> {
         val manifest = plugin.manifest
+        val dependencies = manifest.dependencies ?: emptyList()
         
-        for (dep in manifest.dependencies) {
+        for (dep in dependencies) {
             val depPlugin = loadedPlugins.find { it.manifest.id == dep.pluginId }
             
             if (depPlugin == null) {

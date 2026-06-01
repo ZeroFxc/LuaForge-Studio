@@ -206,28 +206,68 @@ fun PluginItemCard(
                             overflow = TextOverflow.Ellipsis
                         )
                         
-                        val typeText = plugin.manifest.type.uppercase()
-                        val badgeColor = when (plugin.manifest.type.lowercase()) {
-                            "lua" -> MaterialTheme.colorScheme.primaryContainer
-                            else -> MaterialTheme.colorScheme.secondaryContainer
-                        }
-                        val badgeTextColor = when (plugin.manifest.type.lowercase()) {
-                            "lua" -> MaterialTheme.colorScheme.onPrimaryContainer
-                            else -> MaterialTheme.colorScheme.onSecondaryContainer
-                        }
-                        
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(badgeColor)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text(
-                                text = typeText,
-                                fontSize = 10.sp,
-                                color = badgeTextColor,
-                                fontWeight = FontWeight.Bold
-                            )
+                            val typeText = plugin.manifest.type.uppercase()
+                            val badgeColor = when (plugin.manifest.type.lowercase()) {
+                                "lua" -> MaterialTheme.colorScheme.primaryContainer
+                                else -> MaterialTheme.colorScheme.secondaryContainer
+                            }
+                            val badgeTextColor = when (plugin.manifest.type.lowercase()) {
+                                "lua" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSecondaryContainer
+                            }
+                            
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(badgeColor)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = typeText,
+                                    fontSize = 10.sp,
+                                    color = badgeTextColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            
+                            val pluginTypeText = when (plugin.manifest.pluginType.lowercase()) {
+                                "core" -> "核心"
+                                "normal" -> "普通"
+                                "dependent" -> "附属"
+                                "extension" -> "扩展"
+                                else -> plugin.manifest.pluginType
+                            }
+                            val pluginTypeBadgeColor = when (plugin.manifest.pluginType.lowercase()) {
+                                "core" -> MaterialTheme.colorScheme.errorContainer
+                                "normal" -> MaterialTheme.colorScheme.tertiaryContainer
+                                "dependent" -> MaterialTheme.colorScheme.secondaryContainer
+                                "extension" -> MaterialTheme.colorScheme.primaryContainer
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
+                            val pluginTypeTextColor = when (plugin.manifest.pluginType.lowercase()) {
+                                "core" -> MaterialTheme.colorScheme.onErrorContainer
+                                "normal" -> MaterialTheme.colorScheme.onTertiaryContainer
+                                "dependent" -> MaterialTheme.colorScheme.onSecondaryContainer
+                                "extension" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                            
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(pluginTypeBadgeColor)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = pluginTypeText,
+                                    fontSize = 10.sp,
+                                    color = pluginTypeTextColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                     Text(
