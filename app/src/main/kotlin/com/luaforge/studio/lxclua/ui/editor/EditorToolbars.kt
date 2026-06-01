@@ -44,6 +44,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.luaforge.studio.lxclua.R
+import com.luaforge.studio.lxclua.plugin.PluginManager
 import com.luaforge.studio.lxclua.ui.editor.persistence.EditorStateUtil
 import com.luaforge.studio.lxclua.ui.editor.viewmodel.EditorViewModel
 import com.luaforge.studio.lxclua.ui.settings.SettingsManager
@@ -293,6 +294,28 @@ fun EditorMoreMenu(
                     onDismiss()
                 }
             )
+            
+            // 插件菜单项
+            val pluginItems = com.luaforge.studio.lxclua.plugin.state.UIState.pluginMenuItems
+            if (pluginItems.isNotEmpty()) {
+                Divider()
+                pluginItems.forEach { menuItem ->
+                    when (menuItem) {
+                        is com.luaforge.studio.lxclua.plugin.state.UIState.PluginMenuItem.Item -> {
+                            DropdownMenuItem(
+                                text = { Text(menuItem.label) },
+                                onClick = {
+                                    menuItem.onClick.run()
+                                    onDismiss()
+                                }
+                            )
+                        }
+                        is com.luaforge.studio.lxclua.plugin.state.UIState.PluginMenuItem.Divider -> {
+                            Divider()
+                        }
+                    }
+                }
+            }
         }
     }
 }

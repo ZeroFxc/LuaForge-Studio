@@ -1,5 +1,7 @@
 package com.luajava;
 
+import android.util.Log;
+
 import com.android.cglib.proxy.MethodInterceptor;
 import com.android.cglib.proxy.MethodProxy;
 import com.androlua.LuaContext;
@@ -57,7 +59,11 @@ public class LuaMethodInterceptor implements MethodInterceptor {
                     }
                 }
             } catch (LuaException e) {
-                mContext.sendError(methodName, e);
+                if (mContext != null) {
+                    mContext.sendError(methodName, e);
+                } else {
+                    Log.e("LuaMethodInterceptor", "Error in " + methodName, e);
+                }
             }
             if (ret == null)
                 if (retType.equals(boolean.class) || retType.equals(Boolean.class))

@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.FolderOpen
@@ -23,21 +22,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.luaforge.studio.lxclua.R
 import com.luaforge.studio.lxclua.plugin.PluginManager
 import com.luaforge.studio.lxclua.plugin.LoadedPlugin
-import com.luaforge.studio.lxclua.plugin.PluginType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PluginScreen(
     onBack: () -> Unit
@@ -49,7 +44,6 @@ fun PluginScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf<LoadedPlugin?>(null) }
     var isInstalling by remember { mutableStateOf(false) }
 
-    // 选择 ZIP 文件的启动器
     val zipPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -78,135 +72,107 @@ fun PluginScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("插件管理", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
-                        )
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        if (plugins.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Extension,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = "未发现任何插件",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        fontSize = 16.sp
+                    )
+                    TextButton(onClick = { zipPickerLauncher.launch("application/zip") }) {
+                        Text("点击导入 .zip 插件包")
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(plugins, key = { "${it.manifest.id}_${it.enabled}" }) { plugin ->
+                    PluginItemCard(
+                        key = plugin.manifest.id,
+                        plugin = plugin,
+                        onToggle = { enabled ->
+                            PluginManager.togglePlugin(context, plugin.manifest.id, enabled)
+                        },
+                        onDelete = {
+                            showDeleteConfirmDialog = plugin
+                        }
+                    )
+                }
+            }
+        }
+
+        if (isInstalling) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Text("正在安装插件，请稍候...")
+                    }
+                }
+            }
+        }
+
+        showDeleteConfirmDialog?.let { plugin ->
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirmDialog = null },
+                title = { Text("确认删除插件") },
+                text = { Text("确定要彻底删除插件 [${plugin.manifest.name}] 吗？此操作无法撤销。") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            PluginManager.deletePlugin(context, plugin.manifest.id)
+                            showDeleteConfirmDialog = null
+                            Toast.makeText(context, "插件已删除", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text("删除", color = MaterialTheme.colorScheme.error)
                     }
                 },
-                actions = {
-                    IconButton(
-                        onClick = { zipPickerLauncher.launch("application/zip") },
-                        enabled = !isInstalling
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FolderOpen,
-                            contentDescription = "导入插件"
-                        )
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirmDialog = null }) {
+                        Text("取消")
                     }
                 }
             )
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            if (plugins.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Extension,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                        Text(
-                            text = "未发现任何插件",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            fontSize = 16.sp
-                        )
-                        TextButton(onClick = { zipPickerLauncher.launch("application/zip") }) {
-                            Text("点击导入 .zip 插件包")
-                        }
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(plugins, key = { it.manifest.id }) { plugin ->
-                        PluginItemCard(
-                            plugin = plugin,
-                            onToggle = { enabled ->
-                                PluginManager.togglePlugin(context, plugin.manifest.id, enabled)
-                            },
-                            onDelete = {
-                                showDeleteConfirmDialog = plugin
-                            }
-                        )
-                    }
-                }
-            }
-
-            if (isInstalling) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                            Text("正在安装插件，请稍候...")
-                        }
-                    }
-                }
-            }
-
-            // 删除确认对话框
-            showDeleteConfirmDialog?.let { plugin ->
-                AlertDialog(
-                    onDismissRequest = { showDeleteConfirmDialog = null },
-                    title = { Text("确认删除插件") },
-                    text = { Text("确定要彻底删除插件 [${plugin.manifest.name}] 吗？此操作无法撤销。") },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                PluginManager.deletePlugin(context, plugin.manifest.id)
-                                showDeleteConfirmDialog = null
-                                Toast.makeText(context, "插件已删除", Toast.LENGTH_SHORT).show()
-                            }
-                        ) {
-                            Text("删除", color = MaterialTheme.colorScheme.error)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showDeleteConfirmDialog = null }) {
-                            Text("取消")
-                        }
-                    }
-                )
-            }
         }
     }
 }
 
 @Composable
 fun PluginItemCard(
+    key: String,
     plugin: LoadedPlugin,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit
@@ -240,7 +206,6 @@ fun PluginItemCard(
                             overflow = TextOverflow.Ellipsis
                         )
                         
-                        // 插件类型徽章
                         val typeText = plugin.manifest.type.uppercase()
                         val badgeColor = when (plugin.manifest.type.lowercase()) {
                             "lua" -> MaterialTheme.colorScheme.primaryContainer
@@ -303,9 +268,6 @@ fun PluginItemCard(
     }
 }
 
-/**
- * 辅助函数：拷贝 Uri 流至缓存文件
- */
 private fun copyUriToCache(context: Context, uri: Uri): File? {
     return try {
         val cacheFile = File(context.cacheDir, "plugin_import_${System.currentTimeMillis()}.zip")

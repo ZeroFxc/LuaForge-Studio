@@ -99,7 +99,11 @@ public class LuaInvocationHandler implements InvocationHandler {
                     }
                 }
             } catch (Exception e) {
-                mContext.sendError(methodName, e);
+                if (mContext != null) {
+                    mContext.sendError(methodName, e);
+                } else {
+                    Log.e("LuaInvocationHandler", "Error in " + methodName, e);
+                }
             }
             if (ret == null)
                 if (retType.equals(boolean.class) || retType.equals(Boolean.class))

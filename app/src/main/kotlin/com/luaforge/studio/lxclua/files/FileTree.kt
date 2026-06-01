@@ -2,6 +2,7 @@ package com.luaforge.studio.lxclua.files
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import com.luaforge.studio.lxclua.plugin.PluginManager
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -39,6 +40,30 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Html
 import androidx.compose.material.icons.filled.Javascript
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
@@ -771,6 +796,9 @@ fun FileActionBottomSheet(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val isDirectory = node.isDirectory
+    val fileExtension = if (!isDirectory) node.file.name.substringAfterLast('.', "").lowercase() else ""
+    
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
         BottomSheetActionItem(
             Icons.Default.Description,
@@ -796,11 +824,116 @@ fun FileActionBottomSheet(
                 Toast.makeText(context, context.getString(R.string.filetree_path_copied), Toast.LENGTH_SHORT).show()
                 onDismiss()
             })
+        
+        val pluginMenuItems = com.luaforge.studio.lxclua.plugin.state.UIState.fileTreeMenuItems
+        if (pluginMenuItems.isNotEmpty()) {
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                thickness = DividerDefaults.Thickness,
+                color = DividerDefaults.color
+            )
+        }
+        
+        for (menuItem in pluginMenuItems) {
+            when (menuItem) {
+                is com.luaforge.studio.lxclua.plugin.state.UIState.FileTreeMenuItem.Item -> {
+                    if (matchesFilter(menuItem.filter, isDirectory, fileExtension)) {
+                        BottomSheetActionItem(
+                            getIconByName(menuItem.iconName),
+                            menuItem.label,
+                            {
+                                menuItem.onClick(node.file.absolutePath, isDirectory)
+                                onDismiss()
+                            })
+                    }
+                }
+                is com.luaforge.studio.lxclua.plugin.state.UIState.FileTreeMenuItem.Divider -> {
+                    if (matchesFilter(menuItem.filter, isDirectory, fileExtension)) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            thickness = DividerDefaults.Thickness,
+                            color = DividerDefaults.color
+                        )
+                    }
+                }
+            }
+        }
+        
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
         BottomSheetActionItem(
             Icons.Default.Delete,
             stringResource(R.string.delete),
             { onDeleteRequest(); onDismiss() },
             MaterialTheme.colorScheme.error
         )
+    }
+}
+
+/**
+ * 检查菜单项过滤器是否匹配当前文件
+ */
+private fun matchesFilter(filter: String?, isDirectory: Boolean, fileExtension: String): Boolean {
+    if (filter == null) return true
+    
+    return when (filter.lowercase()) {
+        "directory" -> isDirectory
+        "file" -> !isDirectory
+        else -> {
+            if (filter.startsWith('.')) {
+                fileExtension == filter.substring(1).lowercase()
+            } else {
+                fileExtension == filter.lowercase()
+            }
+        }
+    }
+}
+
+/**
+ * 根据图标名称获取 Material 图标
+ */
+private fun getIconByName(iconName: String?): ImageVector {
+    if (iconName == null) {
+        return Icons.Default.Description
+    }
+    
+    return when (iconName.lowercase()) {
+        "folder" -> Icons.Default.Folder
+        "file" -> Icons.Default.Description
+        "code" -> Icons.Default.Code
+        "delete" -> Icons.Default.Delete
+        "copy" -> Icons.Default.ContentCopy
+        "rename" -> Icons.Default.DriveFileRenameOutline
+        "new" -> Icons.Default.CreateNewFolder
+        "settings" -> Icons.Default.Settings
+        "info" -> Icons.Default.Info
+        "edit" -> Icons.Default.Edit
+        "share" -> Icons.Default.Share
+        "download" -> Icons.Default.Download
+        "upload" -> Icons.Default.Upload
+        "star" -> Icons.Default.Star
+        "favorite" -> Icons.Default.Favorite
+        "bookmark" -> Icons.Default.Bookmark
+        "home" -> Icons.Default.Home
+        "search" -> Icons.Default.Search
+        "filter" -> Icons.Default.FilterList
+        "sort" -> Icons.Default.Sort
+        "refresh" -> Icons.Default.Refresh
+        "export" -> Icons.Default.Share
+        "import" -> Icons.Default.Share
+        "send" -> Icons.Default.Send
+        "open" -> Icons.Default.OpenInNew
+        "close" -> Icons.Default.Close
+        "check" -> Icons.Default.Check
+        "alert" -> Icons.Default.Warning
+        "error" -> Icons.Default.Error
+        "success" -> Icons.Default.CheckCircle
+        "play" -> Icons.Default.PlayArrow
+        "pause" -> Icons.Default.Pause
+        "stop" -> Icons.Default.Stop
+        else -> Icons.Default.Description
     }
 }

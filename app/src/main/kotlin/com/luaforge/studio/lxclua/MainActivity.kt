@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Folder
@@ -866,14 +867,20 @@ fun MainScreen(
                         }
                     },
                     navigationIcon = {
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                        if (currentContentType == MainContentType.PROJECTS) {
+                            IconButton(
+                                onClick = {
+                                    scope.launch {
+                                        if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                                    }
                                 }
+                            ) {
+                                Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.cd_menu))
                             }
-                        ) {
-                            Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.cd_menu))
+                        } else {
+                            IconButton(onClick = { shouldReturnToProjects = true }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                            }
                         }
                     },
                     actions = {
@@ -1762,6 +1769,7 @@ class MainActivity : ComponentActivity() {
 
     // 初始化插件系统
     com.luaforge.studio.lxclua.plugin.PluginManager.init(this)
+    com.luaforge.studio.lxclua.plugin.PluginManager.currentActivity = this
 
     enableEdgeToEdge()
     WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -1799,6 +1807,9 @@ class MainActivity : ComponentActivity() {
 
             var shouldShowWelcome by remember { mutableStateOf(shouldShowWelcomeScreen(this@MainActivity)) }
 
+            // 插件对话框宿主
+            com.luaforge.studio.lxclua.ui.plugin.PluginDialogHost()
+
             Crossfade(targetState = shouldShowWelcome, animationSpec = tween(500)) { showWelcome ->
                 if (showWelcome) {
                     WelcomeScreen(
@@ -1826,8 +1837,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+    override fun onResume() {
+        super.onResume()
+        com.luaforge.studio.lxclua.plugin.PluginManager.currentActivity = this
+    }
+    
+    override fun onPause() {
+        super.onPause()
+        com.luaforge.studio.lxclua.plugin.PluginManager.currentActivity = null
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        com.luaforge.studio.lxclua.plugin.PluginManager.currentActivity = null
         com.luaforge.studio.lxclua.ui.editor.viewmodel.CompletionDataManager.clear()
         System.gc()
     }

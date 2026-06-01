@@ -2,17 +2,19 @@ package com.luaforge.studio.lxclua.plugin
 
 import android.content.Context
 import android.os.Environment
-import android.os.Handler
-import android.os.Looper
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import com.google.gson.Gson
+import com.luaforge.studio.lxclua.plugin.api.IPlugin
+import com.luaforge.studio.lxclua.plugin.data.PluginManifest
+import com.luaforge.studio.lxclua.plugin.loaders.DexPluginLoader
+import com.luaforge.studio.lxclua.plugin.loaders.LuaPluginLoader
+import com.luaforge.studio.lxclua.plugin.state.EventManager
+import com.luaforge.studio.lxclua.plugin.state.PluginEvents
+import com.luaforge.studio.lxclua.plugin.state.UIState
 import com.luaforge.studio.lxclua.ui.editor.QuickAction
 import com.luaforge.studio.lxclua.ui.editor.viewmodel.EditorViewModel
 import com.luajava.LuaState
-import com.luajava.LuaStateFactory
-import com.luajava.LuaFunction
-import dalvik.system.DexClassLoader
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import java.io.File
 
 /**
@@ -28,6 +30,8 @@ data class LoadedPlugin(
 
 /**
  * 插件管理引擎单例
+ * 
+ * 负责插件的扫描、加载、卸载和管理
  */
 object PluginManager {
     private const val PREFS_NAME = "plugin_settings"
@@ -35,23 +39,65 @@ object PluginManager {
     
     var appContext: Context? = null
         private set
-        
+    
+    var currentActivity: android.app.Activity? = null
+    
     // 内存中的已扫描插件列表
     val loadedPlugins = mutableStateListOf<LoadedPlugin>()
     
-    // 当前活动的编辑器 ViewModel，用于让插件控制代码输入和读取
+    // 当前活动的编辑器 ViewModel
     var activeViewModel: EditorViewModel? = null
     
-    // 当前活动的工程路径，供插件获取
+    // 当前活动的工程路径
     val currentProjectPath = mutableStateOf<String?>(null)
     
     // 动态注册的快捷功能动作列表
     val pluginQuickActions = mutableStateListOf<QuickAction>()
     private val quickActionsMap = mutableMapOf<String, QuickAction>()
     
-    // 插件事件订阅字典
-    private val eventListeners = mutableMapOf<String, MutableList<Any>>()
-
+    // Compose 对话框状态
+    sealed class DialogState {
+        data class Message(
+            val title: String,
+            val message: String,
+            val onDismiss: () -> Unit
+        ) : DialogState()
+        
+        data class Confirm(
+            val title: String,
+            val message: String,
+            val onConfirm: () -> Unit,
+            val onCancel: (() -> Unit)?,
+            val onDismiss: () -> Unit
+        ) : DialogState()
+        
+        data class Input(
+            val title: String,
+            val hint: String,
+            val defaultValue: String,
+            val onInput: (String) -> Unit,
+            val onDismiss: () -> Unit
+        ) : DialogState()
+        
+        data class SingleChoice(
+            val title: String,
+            val items: Array<String>,
+            val selectedIndex: Int,
+            val onSelect: (Int) -> Unit,
+            val onDismiss: () -> Unit
+        ) : DialogState()
+        
+        data class MultiChoice(
+            val title: String,
+            val items: Array<String>,
+            val checkedItems: BooleanArray,
+            val onConfirm: (BooleanArray) -> Unit,
+            val onDismiss: () -> Unit
+        ) : DialogState()
+    }
+    
+    val currentDialog = mutableStateOf<DialogState?>(null)
+    
     /**
      * 获取插件存放根目录
      */
@@ -67,10 +113,10 @@ object PluginManager {
             File(context.filesDir, "plugins").apply { mkdirs() }
         }
     }
-
+    
     private fun getPrefs(context: Context) = 
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
+    
     /**
      * 初始化插件管理器
      */
@@ -79,7 +125,7 @@ object PluginManager {
         scanPlugins(context)
         loadEnabledPlugins()
     }
-
+    
     /**
      * 扫描所有的插件目录，解析元数据
      */
@@ -97,7 +143,7 @@ object PluginManager {
                     val manifest = Gson().fromJson(content, PluginManifest::class.java)
                     val enabled = prefs.getBoolean(PREF_ENABLED_PREFIX + manifest.id, true)
                     
-                    // 保留已加载插件的运行状态（如果已存在）
+                    // 保留已加载插件的运行状态
                     val existing = loadedPlugins.find { it.manifest.id == manifest.id }
                     if (existing != null) {
                         manifestList.add(existing.copy(manifest = manifest, directory = dir, enabled = enabled))
@@ -110,7 +156,7 @@ object PluginManager {
             }
         }
         
-        // 卸载已经被删除的插件
+        // 卸载已删除的插件
         val currentIds = manifestList.map { it.manifest.id }.toSet()
         loadedPlugins.forEach {
             if (it.manifest.id !in currentIds) {
@@ -121,13 +167,25 @@ object PluginManager {
         loadedPlugins.clear()
         loadedPlugins.addAll(manifestList)
     }
-
+    
     /**
-     * 加载所有已启用的插件
+     * 加载所有已启用的插件（带依赖检查）
      */
     fun loadEnabledPlugins() {
+        // 先加载核心插件
         for (plugin in loadedPlugins) {
-            if (plugin.enabled && plugin.luaState == null && plugin.dexPlugin == null) {
+            if (plugin.enabled && isCorePlugin(plugin) && plugin.luaState == null && plugin.dexPlugin == null) {
+                try {
+                    loadPluginInternal(plugin)
+                } catch (e: Exception) {
+                    android.util.Log.e("PluginManager", "加载核心插件失败: ${plugin.manifest.name}", e)
+                }
+            }
+        }
+        
+        // 然后加载普通插件（按依赖顺序）
+        for (plugin in loadedPlugins) {
+            if (plugin.enabled && !isCorePlugin(plugin) && plugin.luaState == null && plugin.dexPlugin == null) {
                 try {
                     loadPluginInternal(plugin)
                 } catch (e: Exception) {
@@ -135,143 +193,216 @@ object PluginManager {
                 }
             }
         }
+        
+        // 触发所有插件加载完成事件
+        EventManager.fireEvent(PluginEvents.ON_ALL_PLUGINS_LOADED)
     }
-
+    
     /**
-     * 单个插件加载逻辑
+     * 检查是否为核心插件
+     */
+    private fun isCorePlugin(plugin: LoadedPlugin): Boolean {
+        return plugin.manifest.pluginType.equals("core", ignoreCase = true)
+    }
+    
+    /**
+     * 检查插件依赖是否满足
+     * @return Pair(是否满足, 不满足的原因)
+     */
+    fun checkDependencies(plugin: LoadedPlugin): Pair<Boolean, String> {
+        val manifest = plugin.manifest
+        
+        for (dep in manifest.dependencies) {
+            val depPlugin = loadedPlugins.find { it.manifest.id == dep.pluginId }
+            
+            if (depPlugin == null) {
+                if (dep.required) {
+                    return Pair(false, "缺少必需依赖: ${dep.pluginId}")
+                }
+                continue
+            }
+            
+            // 检查版本要求
+            if (!isVersionSatisfied(depPlugin.manifest.version, dep.minVersion)) {
+                if (dep.required) {
+                    return Pair(false, "依赖 ${dep.pluginId} 版本要求 ${dep.minVersion}，当前版本 ${depPlugin.manifest.version}")
+                }
+            }
+            
+            // 检查依赖是否已启用
+            if (!depPlugin.enabled) {
+                if (dep.required) {
+                    return Pair(false, "必需依赖 ${dep.pluginId} 未启用")
+                }
+            }
+        }
+        
+        return Pair(true, "依赖检查通过")
+    }
+    
+    /**
+     * 版本号比较
+     * @return 当前版本是否满足最低版本要求
+     */
+    private fun isVersionSatisfied(currentVersion: String, minVersion: String): Boolean {
+        val currentParts = currentVersion.split(".")
+        val minParts = minVersion.split(".")
+        
+        for (i in 0 until maxOf(currentParts.size, minParts.size)) {
+            val current = currentParts.getOrNull(i)?.toIntOrNull() ?: 0
+            val min = minParts.getOrNull(i)?.toIntOrNull() ?: 0
+            
+            if (current > min) return true
+            if (current < min) return false
+        }
+        return true
+    }
+    
+    /**
+     * 单个插件加载逻辑（带依赖检查）
      */
     private fun loadPluginInternal(plugin: LoadedPlugin) {
         val context = appContext ?: return
         val manifest = plugin.manifest
+        
+        // 检查依赖
+        val (depsOk, depsReason) = checkDependencies(plugin)
+        if (!depsOk) {
+            android.util.Log.w("PluginManager", "插件 ${manifest.name} 依赖检查失败: $depsReason，跳过加载")
+            return
+        }
+        
         val type = manifest.type.lowercase(java.util.Locale.getDefault())
         
-        if (type == "lua") {
-            // 1. 初始化 LuaState 并加载基础库
-            val L = LuaStateFactory.newLuaState()
-            L.openLibs()
-            
-            // 2. 绑定全局 studio 桥梁对象
-            val bridge = PluginBridgeImpl(manifest.id)
-            L.pushJavaObject(bridge)
-            L.setGlobal("studio")
-            
-            // 3. 执行主入口脚本
-            val mainFile = File(plugin.directory, manifest.main)
-            if (mainFile.exists()) {
-                val ok = L.LloadFile(mainFile.absolutePath)
-                if (ok == 0) {
-                    L.getGlobal("debug")
-                    L.getField(-1, "traceback")
-                    L.remove(-2)
-                    L.insert(-2)
-                    val runOk = L.pcall(0, 0, -2)
-                    if (runOk != 0) {
-                        val error = L.toString(-1)
-                        android.util.Log.e("PluginManager", "执行 Lua 插件脚本出错: $error")
-                    }
-                } else {
-                    val error = L.toString(-1)
-                    android.util.Log.e("PluginManager", "编译 Lua 插件失败: $error")
-                }
+        try {
+            if (type == "lua") {
+                LuaPluginLoader.load(plugin, context)
+            } else if (type == "dex" || type == "apk") {
+                DexPluginLoader.load(plugin, context)
             }
-            plugin.luaState = L
-        } else if (type == "dex" || type == "apk") {
-            // 1. 拷贝 DEX/APK 文件到安全缓存区，因为 Android 系统在部分版本上不允许直接加载外部非应用私有目录的 dex
-            val pluginFile = File(plugin.directory, manifest.main)
-            if (pluginFile.exists()) {
-                val cachePluginFile = File(context.codeCacheDir, "${manifest.id}_${manifest.version}.dex")
-                if (!cachePluginFile.exists() || cachePluginFile.length() != pluginFile.length()) {
-                    pluginFile.copyTo(cachePluginFile, overwrite = true)
-                }
-                
-                // 2. 动态加载类并调用 onLoad 入口
-                val classLoader = DexClassLoader(
-                    cachePluginFile.absolutePath,
-                    context.codeCacheDir.absolutePath,
-                    null,
-                    context.classLoader
-                )
-                
-                val mainClass = manifest.mainClass
-                if (mainClass != null) {
-                    val clazz = classLoader.loadClass(mainClass)
-                    val instance = clazz.getDeclaredConstructor().newInstance() as? IPlugin
-                    if (instance != null) {
-                        val bridge = PluginBridgeImpl(manifest.id)
-                        instance.onLoad(context, bridge)
-                        plugin.dexPlugin = instance
-                    }
-                } else {
-                    android.util.Log.e("PluginManager", "插件未指定 mainClass 入口类: ${manifest.id}")
-                }
-            }
+        } catch (e: Exception) {
+            android.util.Log.e("PluginManager", "加载插件失败: ${manifest.name}", e)
         }
     }
-
+    
     /**
      * 单个插件卸载逻辑
      */
     private fun unloadPluginInternal(plugin: LoadedPlugin) {
         val pluginId = plugin.manifest.id
         
-        // 1. 回调并释放 DEX 插件
-        plugin.dexPlugin?.let {
-            try {
-                it.onUnload()
-            } catch (e: Exception) {
-                android.util.Log.e("PluginManager", "卸载 DEX 插件出错: $pluginId", e)
-            }
-            plugin.dexPlugin = null
-        }
-        
-        // 2. 关闭 LuaState
-        plugin.luaState?.let { L ->
-            try {
-                L.close()
-            } catch (e: Exception) {
-                android.util.Log.e("PluginManager", "关闭 LuaState 虚拟器出错: $pluginId", e)
-            }
+        try {
+            // 清理 Lua 状态
+            plugin.luaState?.close()
             plugin.luaState = null
+            
+            // 调用插件的卸载回调
+            plugin.dexPlugin?.onUnload()
+            plugin.dexPlugin = null
+            
+            // 清理该插件注册的 UI 元素
+            removePluginUiElements(pluginId)
+            
+            // 移除该插件的所有事件监听器
+            EventManager.removePluginListeners(pluginId)
+            
+            // 触发插件卸载事件
+            EventManager.fireEvent(PluginEvents.ON_PLUGIN_UNLOADED, pluginId)
+        } catch (e: Exception) {
+            android.util.Log.e("PluginManager", "卸载插件失败: ${plugin.manifest.name}", e)
         }
-        
-        // 3. 移除该插件动态添加的快捷工具栏动作
-        val keysToRemove = quickActionsMap.keys.filter { it.startsWith("${pluginId}_") }
-        keysToRemove.forEach { key ->
-            quickActionsMap.remove(key)
-        }
+    }
+    
+    /**
+     * 移除插件注册的所有 UI 元素
+     */
+    private fun removePluginUiElements(pluginId: String) {
+        // 移除快捷操作
+        quickActionsMap.keys.removeAll { it.startsWith("${pluginId}_") }
         updateQuickActions()
         
-        // 4. 清理该插件注册的所有事件监听
-        eventListeners.values.forEach { list ->
-            // 如果是 DEX 加载，我们可以通过反射/类加载器区分，但在 Kotlin 简单的做法是过滤包含包名的监听器或清空
-            // 为了安全，在卸载时暂时只允许清理 Lua 监听器以及与特定插件相关的实例
-            val iterator = list.iterator()
-            while (iterator.hasNext()) {
-                val listener = iterator.next()
-                if (listener is LuaFunction<*>) {
-                    // 对于 Lua 虚拟机已关闭的情况，对应的 LuaFunction 也失效，应当清除
-                    iterator.remove()
-                } else {
-                    // 如果是 DEX 插件的实例，我们根据它的 ClassLoader 判断是否属于该插件的 ClassLoader
-                    val classLoader = listener.javaClass.classLoader
-                    if (classLoader is DexClassLoader && classLoader.toString().contains(pluginId)) {
-                        iterator.remove()
-                    }
-                }
+        // 移除菜单项
+        UIState.removePluginMenuItems(pluginId)
+        
+        // 移除文件树菜单项
+        UIState.removeFileTreeMenuItems(pluginId)
+    }
+    
+    /**
+     * 更新快捷操作列表
+     */
+    fun updateQuickActions() {
+        pluginQuickActions.clear()
+        pluginQuickActions.addAll(quickActionsMap.values)
+    }
+    
+    /**
+     * 添加快捷操作
+     */
+    fun addQuickAction(pluginId: String, key: String, action: QuickAction) {
+        val globalKey = "${pluginId}_$key"
+        quickActionsMap[globalKey] = action
+        updateQuickActions()
+    }
+    
+    /**
+     * 移除快捷操作
+     */
+    fun removeQuickAction(pluginId: String, key: String) {
+        val globalKey = "${pluginId}_$key"
+        quickActionsMap.remove(globalKey)
+        updateQuickActions()
+    }
+    
+    /**
+     * 清除插件的所有快捷操作
+     */
+    fun clearQuickActions(pluginId: String) {
+        quickActionsMap.keys.removeAll { it.startsWith("${pluginId}_") }
+        updateQuickActions()
+    }
+    
+    /**
+     * 启用/禁用插件
+     */
+    fun setPluginEnabled(context: Context, pluginId: String, enabled: Boolean) {
+        val plugin = loadedPlugins.find { it.manifest.id == pluginId }
+        if (plugin != null) {
+            plugin.enabled = enabled
+            getPrefs(context).edit()
+                .putBoolean(PREF_ENABLED_PREFIX + pluginId, enabled)
+                .apply()
+            
+            if (enabled) {
+                loadPluginInternal(plugin)
+            } else {
+                unloadPluginInternal(plugin)
             }
         }
     }
-
+    
     /**
-     * 启用/停用插件
+     * 触发事件
+     */
+    fun fireEvent(eventName: String, vararg args: Any?) {
+        EventManager.fireEvent(eventName, *args)
+    }
+    
+    /**
+     * 通知事件（与 fireEvent 功能相同，为了兼容旧代码）
+     */
+    fun notifyEvent(eventName: String, vararg args: Any?) {
+        EventManager.fireEvent(eventName, *args)
+    }
+    
+    /**
+     * 动态切换插件启用状态
      */
     fun togglePlugin(context: Context, pluginId: String, enabled: Boolean) {
         val index = loadedPlugins.indexOfFirst { it.manifest.id == pluginId }
         if (index != -1) {
             val plugin = loadedPlugins[index]
-            plugin.enabled = enabled
             
-            // 写入 Preferences 固化状态
             getPrefs(context).edit()
                 .putBoolean(PREF_ENABLED_PREFIX + pluginId, enabled)
                 .apply()
@@ -286,11 +417,11 @@ object PluginManager {
                 unloadPluginInternal(plugin)
             }
             
-            // 触发列表状态刷新 (使用 copy 创建新引用确保 Compose 可检测变更)
-            loadedPlugins[index] = plugin.copy()
+            val updatedPlugin = plugin.copy(enabled = enabled)
+            loadedPlugins[index] = updatedPlugin
         }
     }
-
+    
     /**
      * 彻底删除插件
      */
@@ -300,10 +431,8 @@ object PluginManager {
             val plugin = loadedPlugins[index]
             unloadPluginInternal(plugin)
             
-            // 删除目录
             val success = plugin.directory.deleteRecursively()
             
-            // 从 Preferences 移除状态
             getPrefs(context).edit()
                 .remove(PREF_ENABLED_PREFIX + pluginId)
                 .apply()
@@ -313,7 +442,7 @@ object PluginManager {
         }
         return false
     }
-
+    
     /**
      * 从 Zip 文件解压并安装插件
      */
@@ -322,10 +451,8 @@ object PluginManager {
             val tempDir = File(context.cacheDir, "temp_plugin_extract_${System.currentTimeMillis()}")
             tempDir.mkdirs()
             
-            // 解压到缓存
             com.luaforge.studio.lxclua.utils.FileUtil.extractZip(zipFile, tempDir)
             
-            // 查找 manifest.json 清单文件 (可能包含一层文件夹包裹)
             var manifestFile = File(tempDir, "manifest.json")
             if (!manifestFile.exists()) {
                 val children = tempDir.listFiles()
@@ -340,148 +467,24 @@ object PluginManager {
             val content = manifestFile.readText()
             val manifest = Gson().fromJson(content, PluginManifest::class.java)
             
-            // 目标存放路径
             val pluginsDir = getPluginsDir(context)
             val destDir = File(pluginsDir, manifest.id)
             
-            // 卸载旧版本插件并清理旧偏好设置
-            val oldPlugin = loadedPlugins.find { it.manifest.id == manifest.id }
-            if (oldPlugin != null) {
-                unloadPluginInternal(oldPlugin)
-                loadedPlugins.remove(oldPlugin)
-            }
-            getPrefs(context).edit()
-                .remove(PREF_ENABLED_PREFIX + manifest.id)
-                .apply()
-            
             if (destDir.exists()) {
-                destDir.deleteRecursively()
+                togglePlugin(context, manifest.id, false)
+                getPrefs(context).edit().remove(PREF_ENABLED_PREFIX + manifest.id).apply()
             }
             
-            // 拷贝至 plugins 文件夹
+            destDir.deleteRecursively()
             val sourceDir = manifestFile.parentFile ?: tempDir
             sourceDir.copyRecursively(destDir, overwrite = true)
             tempDir.deleteRecursively()
             
-            // 重新扫描并动态加载
             scanPlugins(context)
-            val loaded = loadedPlugins.find { it.manifest.id == manifest.id }
-            if (loaded != null && loaded.enabled) {
-                loadPluginInternal(loaded)
-            }
             
             return Result.success(manifest)
         } catch (e: Exception) {
             return Result.failure(e)
-        }
-    }
-
-    /**
-     * 发送 IDE 事件通知到所有的插件监听器
-     */
-    fun notifyEvent(eventName: String, vararg args: Any?) {
-        val list = eventListeners[eventName] ?: return
-        // 复制一份，防止在迭代时有监听器反注册导致 ConcurrentModificationException
-        val listCopy = ArrayList(list)
-        for (listener in listCopy) {
-            try {
-                if (listener is IPluginEventListener) {
-                    listener.onEvent(*args)
-                } else if (listener is LuaFunction<*>) {
-                    listener.call(args)
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("PluginManager", "通知事件 $eventName 到监听器 $listener 发生错误", e)
-            }
-        }
-    }
-
-    /**
-     * 更新渲染快捷动作的 Compose 列表
-     */
-    private fun updateQuickActions() {
-        pluginQuickActions.clear()
-        pluginQuickActions.addAll(quickActionsMap.values)
-    }
-
-    /**
-     * 桥梁接口具体实现
-     */
-    private class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
-        private val handler = Handler(Looper.getMainLooper())
-
-        override fun toast(message: String) {
-            handler.post {
-                appContext?.let {
-                    android.widget.Toast.makeText(it, message, android.widget.Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-
-        override fun log(tag: String, message: String) {
-            com.luaforge.studio.lxclua.utils.LogCatcher.d(tag, message)
-        }
-
-        override fun getVersion(): String {
-            return appContext?.packageManager?.getPackageInfo(appContext!!.packageName, 0)?.versionName ?: "1.0.0"
-        }
-
-        override fun getActiveFile(): String? {
-            return activeViewModel?.activeFileState?.file?.absolutePath
-        }
-
-        override fun getActiveText(): String? {
-            return activeViewModel?.activeFileState?.content
-        }
-
-        override fun setActiveText(text: String) {
-            handler.post {
-                activeViewModel?.let { vm ->
-                    vm.activeFileState?.onContentChanged(text)
-                    vm.getActiveEditor()?.setText(text)
-                }
-            }
-        }
-
-        override fun insertText(text: String) {
-            handler.post {
-                activeViewModel?.insertSymbolToCorrectEditor(text)
-            }
-        }
-
-        override fun getProjectPath(): String? {
-            return currentProjectPath.value
-        }
-
-        override fun addQuickAction(key: String, label: String, onClick: Runnable) {
-            val globalKey = "${pluginId}_$key"
-            val action = QuickAction(
-                labelResId = 0,
-                labelString = label,
-                key = globalKey,
-                onClick = {
-                    onClick.run()
-                }
-            )
-            handler.post {
-                quickActionsMap[globalKey] = action
-                updateQuickActions()
-            }
-        }
-
-        override fun removeQuickAction(key: String) {
-            val globalKey = "${pluginId}_$key"
-            handler.post {
-                quickActionsMap.remove(globalKey)
-                updateQuickActions()
-            }
-        }
-
-        override fun registerEventListener(eventName: String, listener: Any) {
-            val list = eventListeners.getOrPut(eventName) { mutableListOf() }
-            if (listener !in list) {
-                list.add(listener)
-            }
         }
     }
 }
