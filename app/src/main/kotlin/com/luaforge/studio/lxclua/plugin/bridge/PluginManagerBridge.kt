@@ -1,5 +1,6 @@
 package com.luaforge.studio.lxclua.plugin.bridge
 
+import com.luaforge.studio.lxclua.R
 import com.luaforge.studio.lxclua.plugin.PluginManager
 
 /**
@@ -232,11 +233,12 @@ class PluginManagerBridge {
      */
     fun getPluginCategoryLabel(pluginId: String): String {
         val category = getPluginCategory(pluginId) ?: "normal"
+        val context = PluginManager.appContext ?: return category
         return when (category.lowercase()) {
-            "core" -> "核心"
-            "normal" -> "普通"
-            "dependent" -> "附属"
-            "extension" -> "扩展"
+            "core" -> context.getString(R.string.plugin_category_core)
+            "normal" -> context.getString(R.string.plugin_category_normal)
+            "dependent" -> context.getString(R.string.plugin_category_dependent)
+            "extension" -> context.getString(R.string.plugin_category_extension)
             else -> category
         }
     }

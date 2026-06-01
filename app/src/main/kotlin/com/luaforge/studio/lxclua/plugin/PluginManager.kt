@@ -3,6 +3,7 @@ package com.luaforge.studio.lxclua.plugin
 import android.content.Context
 import android.os.Environment
 import com.google.gson.Gson
+import com.luaforge.studio.lxclua.R
 import com.luaforge.studio.lxclua.ProjectItem
 import com.luaforge.studio.lxclua.plugin.api.IPlugin
 import com.luaforge.studio.lxclua.plugin.data.PluginManifest
@@ -51,8 +52,14 @@ object PluginManager {
     // 当前活动的编辑器 ViewModel
     var activeViewModel: EditorViewModel? = null
     
+    // 当前活动的符号栏面板状态
+    var activePanelState: com.luaforge.studio.lxclua.ui.editor.DraggablePanelState? = null
+    
     // 当前活动的工程路径
     val currentProjectPath = mutableStateOf<String?>(null)
+    
+    // 插件自定义的符号栏额外符号
+    val customSymbolBarSymbols = mutableStateListOf<String>()
     
     // 动态注册的快捷功能动作列表
     val pluginQuickActions = mutableStateListOf<QuickAction>()
@@ -289,6 +296,7 @@ object PluginManager {
      * @return Pair(是否满足, 不满足的原因)
      */
     fun checkDependencies(plugin: LoadedPlugin): Pair<Boolean, String> {
+        val context = appContext
         val manifest = plugin.manifest
         val dependencies = manifest.dependencies ?: emptyList()
         
@@ -297,27 +305,30 @@ object PluginManager {
             
             if (depPlugin == null) {
                 if (dep.required) {
-                    return Pair(false, "缺少必需依赖: ${dep.pluginId}")
+                    return Pair(false, context?.getString(R.string.plugin_dependency_missing, dep.pluginId)
+                        ?: "缺少必需依赖: ${dep.pluginId}")
                 }
                 continue
             }
             
-            // 检查版本要求
             if (!isVersionSatisfied(depPlugin.manifest.version, dep.minVersion)) {
                 if (dep.required) {
-                    return Pair(false, "依赖 ${dep.pluginId} 版本要求 ${dep.minVersion}，当前版本 ${depPlugin.manifest.version}")
+                    return Pair(false, context?.getString(
+                        R.string.plugin_dependency_version_mismatch,
+                        dep.pluginId, dep.minVersion, depPlugin.manifest.version
+                    ) ?: "依赖 ${dep.pluginId} 版本要求 ${dep.minVersion}，当前版本 ${depPlugin.manifest.version}")
                 }
             }
             
-            // 检查依赖是否已启用
             if (!depPlugin.enabled) {
                 if (dep.required) {
-                    return Pair(false, "必需依赖 ${dep.pluginId} 未启用")
+                    return Pair(false, context?.getString(R.string.plugin_dependency_disabled, dep.pluginId)
+                        ?: "必需依赖 ${dep.pluginId} 未启用")
                 }
             }
         }
         
-        return Pair(true, "依赖检查通过")
+        return Pair(true, context?.getString(R.string.plugin_dependency_check_passed) ?: "依赖检查通过")
     }
     
     /**
@@ -431,8 +442,11 @@ object PluginManager {
         // 移除注册的快捷键
         com.luaforge.studio.lxclua.plugin.bridge.PluginShortcut.removeAllPluginShortcuts(pluginId)
         
-        // 移除注册的补全数据
-        com.luaforge.studio.lxclua.plugin.bridge.PluginCompletion.removeAllPluginCompletionData(pluginId)
+        // 移除注册     // 移除注册的语法高亮规则
+        com.luaforge.studio.lxclua.plugin.bridge.PluginSyntax.removePluginLanguages(pluginId)
+        
+        // 移除该插件的所有通知
+        com.luaforge.studio.lxclua.plugin.state.NotificationState.clearPlugin(pluginId)
     }
     
     /**
@@ -561,7 +575,9 @@ object PluginManager {
             val extractOk = com.luaforge.studio.lxclua.utils.FileUtil.extractZip(zipFile, tempDir)
             if (!extractOk) {
                 tempDir.deleteRecursively()
-                return Result.failure(Exception("ZIP 解压失败，文件可能已损坏"))
+                return Result.failure(Exception(
+                    context.getString(R.string.plugin_zip_extract_failed)
+                ))
             }
             
             var manifestFile = File(tempDir, "manifest.json")
@@ -571,7 +587,9 @@ object PluginManager {
                 if (nestedDir != null) {
                     manifestFile = File(nestedDir, "manifest.json")
                 } else {
-                    return Result.failure(Exception("ZIP 包内未找到 manifest.json"))
+                    return Result.failure(Exception(
+                        context.getString(R.string.plugin_zip_no_manifest)
+                    ))
                 }
             }
             
@@ -606,7 +624,9 @@ object PluginManager {
         try {
             val manifestFile = File(sourceDir, "manifest.json")
             if (!manifestFile.exists()) {
-                return Result.failure(Exception("目录中未找到 manifest.json"))
+                return Result.failure(Exception(
+                    context.getString(R.string.plugin_dir_no_manifest)
+                ))
             }
             
             val content = manifestFile.readText()

@@ -239,11 +239,13 @@ fun CodeEditScreen(
 
     androidx.compose.runtime.DisposableEffect(projectPath) {
         com.luaforge.studio.lxclua.plugin.PluginManager.activeViewModel = viewModel
+        com.luaforge.studio.lxclua.plugin.PluginManager.activePanelState = panelState
         com.luaforge.studio.lxclua.plugin.PluginManager.currentProjectPath.value = projectPath
         com.luaforge.studio.lxclua.plugin.PluginManager.notifyEvent("onEditorInit", projectPath)
         com.luaforge.studio.lxclua.plugin.bridge.PluginShortcut.ensureSubscribed()
         onDispose {
             com.luaforge.studio.lxclua.plugin.PluginManager.activeViewModel = null
+            com.luaforge.studio.lxclua.plugin.PluginManager.activePanelState = null
             com.luaforge.studio.lxclua.plugin.PluginManager.currentProjectPath.value = null
             com.luaforge.studio.lxclua.plugin.PluginManager.notifyEvent("onEditorClose", projectPath)
         }

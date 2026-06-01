@@ -674,4 +674,25 @@
     <string name="plugin_extended_by_label">Extended by:</string>
     <string name="plugin_detail_extensions">Plugin Settings</string>
     <string name="drawer_plugin_management">Plugin Management</string>
+
+    <!-- Plugin notification channels -->
+    <string name="plugin_notification_channel_name">Plugin Notifications</string>
+    <string name="plugin_notification_channel_desc">LuaForge Plugin System Notifications</string>
+    <string name="plugin_notification_info_channel_name">Plugin Notification - Info</string>
+    <string name="plugin_notification_info_channel_desc">Info-level plugin notifications</string>
+    <string name="plugin_notification_warning_channel_name">Plugin Notification - Warning</string>
+    <string name="plugin_notification_warning_channel_desc">Warning-level plugin notifications</string>
+    <string name="plugin_notification_error_channel_name">Plugin Notification - Error</string>
+    <string name="plugin_notification_error_channel_desc">Error-level plugin notifications</string>
+    <string name="plugin_notification_success_channel_name">Plugin Notification - Success</string>
+    <string name="plugin_notification_success_channel_desc">Success-level plugin notifications</string>
+
+    <!-- Plugin manager error messages -->
+    <string name="plugin_zip_extract_failed">ZIP extraction failed, file may be corrupted</string>
+    <string name="plugin_zip_no_manifest">manifest.json not found in ZIP package</string>
+    <string name="plugin_dir_no_manifest">manifest.json not found in directory</string>
+    <string name="plugin_dependency_missing">Missing required dependency: %s</string>
+    <string name="plugin_dependency_version_mismatch">Dependency %1$s requires version %2$s, current version %3$s</string>
+    <string name="plugin_dependency_disabled">Required dependency %s is not enabled</string>
+    <string name="plugin_dependency_check_passed">Dependency check passed</string>
 </resources>

@@ -1,0 +1,16 @@
+{
+  "id": "com.example.notification_demo",
+  "name": "通知系统演示",
+  "version": "1.0.0",
+  "description": "演示 plugin.notification 通知系统的所有功能：IDE 内通知横幅、系统通知栏推送、通知分组和优先级",
+  "author": "DifierLine",
+  "type": "lua",
+  "pluginType": "normal",
+  "main": "main.lua",
+  "apiVersion": 1,
+  "category": "demo",
+  "homepage": null,
+  "icon": null,
+  "dependencies": [],
+  "extendedBy": []
+}

@@ -684,4 +684,25 @@
     <string name="plugin_extended_by_label">被扩展:</string>
     <string name="plugin_detail_extensions">插件设置</string>
     <string name="drawer_plugin_management">插件管理</string>
+
+    <!-- 插件通知渠道 -->
+    <string name="plugin_notification_channel_name">插件通知</string>
+    <string name="plugin_notification_channel_desc">LuaForge 插件系统通知</string>
+    <string name="plugin_notification_info_channel_name">插件通知 - 信息</string>
+    <string name="plugin_notification_info_channel_desc">信息级别的插件通知</string>
+    <string name="plugin_notification_warning_channel_name">插件通知 - 警告</string>
+    <string name="plugin_notification_warning_channel_desc">警告级别的插件通知</string>
+    <string name="plugin_notification_error_channel_name">插件通知 - 错误</string>
+    <string name="plugin_notification_error_channel_desc">错误级别的插件通知</string>
+    <string name="plugin_notification_success_channel_name">插件通知 - 成功</string>
+    <string name="plugin_notification_success_channel_desc">成功级别的插件通知</string>
+
+    <!-- 插件管理器错误消息 -->
+    <string name="plugin_zip_extract_failed">ZIP 解压失败，文件可能已损坏</string>
+    <string name="plugin_zip_no_manifest">ZIP 包内未找到 manifest.json</string>
+    <string name="plugin_dir_no_manifest">目录中未找到 manifest.json</string>
+    <string name="plugin_dependency_missing">缺少必需依赖: %s</string>
+    <string name="plugin_dependency_version_mismatch">依赖 %1$s 版本要求 %2$s，当前版本 %3$s</string>
+    <string name="plugin_dependency_disabled">必需依赖 %s 未启用</string>
+    <string name="plugin_dependency_check_passed">依赖检查通过</string>
 </resources>

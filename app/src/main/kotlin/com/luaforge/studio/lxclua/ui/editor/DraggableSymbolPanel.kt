@@ -234,11 +234,13 @@ fun SymbolBar(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
-    val symbols = listOf(
+    val baseSymbols = listOf(
         "function()", "(", ")", "[", "]", "{", "}", "\"", "=", ":",
         ".", ",", ";", "_", "+", "-", "*", "/", "\\", "%",
         "#", "^", "$", "?", "&", "|", "<", ">", "~", "'"
     )
+    val customSymbols = PluginManager.customSymbolBarSymbols.toList()
+    val symbols = baseSymbols + customSymbols
 
     val smartSortingEnabled by remember { derivedStateOf { SettingsManager.currentSettings.smartSortingEnabled } }
     val selectedClassName = viewModel.selectedClassName

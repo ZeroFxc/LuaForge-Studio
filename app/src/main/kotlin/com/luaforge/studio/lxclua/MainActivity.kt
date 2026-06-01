@@ -2106,6 +2106,9 @@ class MainActivity : ComponentActivity() {
                             .consumeWindowInsets(WindowInsets.ime)
                     ) {
                         MainApp()
+                        
+                        // 插件通知横幅 — 浮在最上层，贯穿全局
+                        com.luaforge.studio.lxclua.ui.plugin.PluginNotificationBanner()
                     }
                 }
             }

@@ -22,7 +22,9 @@ interface IPluginBridge :
     IPluginBridgeLogger,
     IPluginBridgeResourceRegistry,
     IPluginBridgeShortcut,
-    IPluginBridgeCompletion {
+    IPluginBridgeCompletion,
+    IPluginBridgeSymbolBar,
+    IPluginBridgeSyntax {
     
     // ==================== 基础功能 ====================
     

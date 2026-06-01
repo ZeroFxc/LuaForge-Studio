@@ -59,6 +59,10 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
         PluginCompletion(pluginId)
     }
     
+    private val syntaxBridge by lazy {
+        PluginSyntax(pluginId)
+    }
+    
     // ==================== 基础功能 ====================
     
     override fun toast(message: String) {
@@ -1216,5 +1220,137 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
     
     override fun clearAll(): Array<Int> {
         return completionBridge.clearAll()
+    }
+    
+    // ==================== 符号栏操作 ====================
+    
+    override fun getSymbols(): Array<String> {
+        val baseSymbols = arrayOf(
+            "function()", "(", ")", "[", "]", "{", "}", "\"", "=", ":",
+            ".", ",", ";", "_", "+", "-", "*", "/", "\\", "%",
+            "#", "^", "$", "?", "&", "|", "<", ">", "~", "'"
+        )
+        val custom = PluginManager.customSymbolBarSymbols.toList()
+        return (baseSymbols.toList() + custom).toTypedArray()
+    }
+    
+    override fun addSymbol(symbol: String): Boolean {
+        val baseSet = setOf(
+            "function()", "(", ")", "[", "]", "{", "}", "\"", "=", ":",
+            ".", ",", ";", "_", "+", "-", "*", "/", "\\", "%",
+            "#", "^", "$", "?", "&", "|", "<", ">", "~", "'"
+        )
+        if (symbol in baseSet) return false
+        if (symbol in PluginManager.customSymbolBarSymbols) return false
+        handler.post {
+            PluginManager.customSymbolBarSymbols.add(symbol)
+        }
+        return true
+    }
+    
+    override fun removeSymbol(symbol: String): Boolean {
+        val baseSet = setOf(
+            "function()", "(", ")", "[", "]", "{", "}", "\"", "=", ":",
+            ".", ",", ";", "_", "+", "-", "*", "/", "\\", "%",
+            "#", "^", "$", "?", "&", "|", "<", ">", "~", "'"
+        )
+        if (symbol in baseSet) return false
+        if (symbol !in PluginManager.customSymbolBarSymbols) return false
+        handler.post {
+            PluginManager.customSymbolBarSymbols.remove(symbol)
+        }
+        return true
+    }
+    
+    override fun clearCustomSymbols() {
+        handler.post {
+            PluginManager.customSymbolBarSymbols.clear()
+        }
+    }
+    
+    override fun getSymbolFrequency(symbol: String): Int {
+        return PluginManager.activeViewModel?.symbolFrequencyMap?.get(symbol) ?: 0
+    }
+    
+    override fun getAllSymbolFrequencies(): Map<String, Int> {
+        return PluginManager.activeViewModel?.symbolFrequencyMap?.toMap() ?: emptyMap()
+    }
+    
+    override fun incrementSymbolFrequency(symbol: String) {
+        PluginManager.activeViewModel?.incrementSymbolFrequency(symbol)
+    }
+    
+    override fun insertSymbol(symbol: String) {
+        handler.post {
+            PluginManager.activeViewModel?.insertSymbolToCorrectEditor(symbol)
+        }
+    }
+    
+    override fun getSelectedClassName(): String? {
+        return PluginManager.activeViewModel?.selectedClassName
+    }
+    
+    override fun getSelectedClassCandidates(): Array<String>? {
+        return PluginManager.activeViewModel?.selectedClassCandidates?.toTypedArray()
+    }
+    
+    override fun setPanelExpanded(expanded: Boolean) {
+        handler.post {
+            val panelState = PluginManager.activePanelState ?: return@post
+            if (expanded) {
+                panelState.animateToHeight(panelState.maxHeight * 0.8f)
+            } else {
+                panelState.animateToHeight(panelState.minHeight)
+            }
+        }
+    }
+    
+    override fun isPanelExpanded(): Boolean {
+        val panelState = PluginManager.activePanelState ?: return false
+        return panelState.isAboveThreshold
+    }
+    
+    override fun setPanelHeight(heightPx: Float) {
+        handler.post {
+            PluginManager.activePanelState?.updateHeight(heightPx)
+        }
+    }
+    
+    override fun getPanelHeight(): Float {
+        return PluginManager.activePanelState?.height ?: 0f
+    }
+    
+    override fun getPanelMinHeight(): Float {
+        return PluginManager.activePanelState?.minHeight ?: 0f
+    }
+    
+    override fun getPanelMaxHeight(): Float {
+        return PluginManager.activePanelState?.maxHeight ?: 0f
+    }
+    
+    // ==================== 语法高亮扩展 ====================
+    
+    override fun registerLanguage(languageId: String, rules: Map<String, Any>): Boolean {
+        return syntaxBridge.registerLanguage(languageId, rules)
+    }
+    
+    override fun unregisterLanguage(languageId: String): Boolean {
+        return syntaxBridge.unregisterLanguage(languageId)
+    }
+    
+    override fun getLanguageRules(languageId: String): Map<String, Any>? {
+        return syntaxBridge.getLanguageRules(languageId)
+    }
+    
+    override fun getAllRegisteredLanguages(): Array<String> {
+        return syntaxBridge.getAllRegisteredLanguages()
+    }
+    
+    override fun clearMyLanguages(): Int {
+        return syntaxBridge.clearMyLanguages()
+    }
+    
+    override fun isLanguageRegistered(languageId: String): Boolean {
+        return syntaxBridge.isLanguageRegistered(languageId)
     }
 }
