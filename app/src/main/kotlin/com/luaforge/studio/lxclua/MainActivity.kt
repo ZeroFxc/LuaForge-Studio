@@ -743,9 +743,6 @@ fun MainScreen(
                         }
                     },
                     actions = {
-                        // 通知中心按钮（所有页面可见）
-                        com.luaforge.studio.lxclua.ui.plugin.NotificationCenterButton()
-                        
                         when (currentContentType) {
                             MainContentType.PROJECTS -> {
                                 // 搜索按钮
@@ -2088,9 +2085,6 @@ class MainActivity : ComponentActivity() {
 
             // 插件对话框宿主
             com.luaforge.studio.lxclua.ui.plugin.PluginDialogHost()
-
-            // 通知横幅宿主
-            com.luaforge.studio.lxclua.ui.plugin.NotificationBannerHost()
 
             Crossfade(targetState = shouldShowWelcome, animationSpec = tween(500)) { showWelcome ->
                 if (showWelcome) {

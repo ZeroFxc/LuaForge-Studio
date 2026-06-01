@@ -28,7 +28,6 @@ import java.io.File
  * - plugin.assets: 资源注册表（注册/查询/读取跨插件共享资源）
  * - plugin.shortcut: 快捷键绑定（注册/查询/冲突检测）
  * - plugin.completion: 代码补全扩展（关键字/包函数/变量类型/自定义提供器）
- * - plugin.notification: 通知系统（IDE 内横幅 + 系统通知栏推送 + 分组/优先级）
  */
 class PluginBridge(private val context: Context, private val pluginId: String) {
     
@@ -96,9 +95,6 @@ class PluginBridge(private val context: Context, private val pluginId: String) {
     
     /** 代码补全扩展 API */
     val completion = PluginCompletion(pluginId)
-    
-    /** 通知系统 API */
-    val notification = PluginNotification(context, pluginId)
     
     // ============ 版本信息 ============
     

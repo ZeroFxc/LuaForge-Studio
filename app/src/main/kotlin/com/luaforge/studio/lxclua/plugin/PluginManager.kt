@@ -433,9 +433,6 @@ object PluginManager {
         
         // 移除注册的补全数据
         com.luaforge.studio.lxclua.plugin.bridge.PluginCompletion.removeAllPluginCompletionData(pluginId)
-        
-        // 移除通知
-        com.luaforge.studio.lxclua.plugin.state.NotificationState.dismissPluginNotifications(pluginId)
     }
     
     /**
