@@ -19,7 +19,8 @@ import androidx.compose.ui.unit.dp
 
 // 快捷功能数据类
 data class QuickAction(
-    val labelResId: Int,
+    val labelResId: Int = 0,
+    val labelString: String? = null,
     val key: String,
     val onClick: () -> Unit
 )
@@ -66,7 +67,7 @@ fun QuickActionButton(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = stringResource(action.labelResId),
+                text = if (action.labelResId != 0) stringResource(action.labelResId) else (action.labelString ?: ""),
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

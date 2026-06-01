@@ -112,7 +112,8 @@ data class ProjectItem(
 enum class MainContentType {
     PROJECTS,
     SETTINGS,
-    ABOUT
+    ABOUT,
+    PLUGINS
 }
 
 enum class ConflictAction {
@@ -743,6 +744,37 @@ fun MainScreen(
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
+
+                    NavigationDrawerItem(
+                        label = {
+                            Text("插件管理", fontWeight = FontWeight.Medium)
+                        },
+                        selected = currentContentType == MainContentType.PLUGINS,
+                        onClick = {
+                            currentContentType = MainContentType.PLUGINS
+                            scope.launch { drawerState.close() }
+                        },
+                        icon = {
+                            Icon(
+                                Icons.Filled.Extension,
+                                contentDescription = "插件管理",
+                                tint = if (currentContentType == MainContentType.PLUGINS)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        colors = NavigationDrawerItemDefaults.colors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedContainerColor = Color.Transparent,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -826,6 +858,7 @@ fun MainScreen(
                                     MainContentType.PROJECTS -> stringResource(R.string.app_name)
                                     MainContentType.SETTINGS -> stringResource(R.string.settings)
                                     MainContentType.ABOUT -> stringResource(R.string.about)
+                                    MainContentType.PLUGINS -> "插件管理"
                                 },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -925,7 +958,7 @@ fun MainScreen(
                                 }
                             }
 
-                            MainContentType.SETTINGS, MainContentType.ABOUT -> {
+                            MainContentType.SETTINGS, MainContentType.ABOUT, MainContentType.PLUGINS -> {
                             }
                         }
                     },
@@ -958,7 +991,7 @@ fun MainScreen(
                         )
                     }
 
-                    MainContentType.SETTINGS, MainContentType.ABOUT -> {
+                    MainContentType.SETTINGS, MainContentType.ABOUT, MainContentType.PLUGINS -> {
                     }
                 }
             },
@@ -1081,6 +1114,14 @@ fun MainScreen(
 
                         MainContentType.ABOUT -> {
                             AboutScreen(
+                                onBack = {
+                                    shouldReturnToProjects = true
+                                }
+                            )
+                        }
+
+                        MainContentType.PLUGINS -> {
+                            com.luaforge.studio.lxclua.ui.plugin.PluginScreen(
                                 onBack = {
                                     shouldReturnToProjects = true
                                 }
@@ -1718,6 +1759,9 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+
+    // 初始化插件系统
+    com.luaforge.studio.lxclua.plugin.PluginManager.init(this)
 
     enableEdgeToEdge()
     WindowCompat.setDecorFitsSystemWindows(window, false)

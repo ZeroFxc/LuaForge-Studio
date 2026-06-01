@@ -748,6 +748,11 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                     inserted: CharSequence
                 ) {
                     state.onContentChanged(content.toString())
+                    com.luaforge.studio.lxclua.plugin.PluginManager.notifyEvent(
+                        "onTextChanged",
+                        state.file.absolutePath,
+                        content.toString()
+                    )
                 }
 
                 override fun afterDelete(
@@ -759,6 +764,11 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                     deleted: CharSequence
                 ) {
                     state.onContentChanged(content.toString())
+                    com.luaforge.studio.lxclua.plugin.PluginManager.notifyEvent(
+                        "onTextChanged",
+                        state.file.absolutePath,
+                        content.toString()
+                    )
                 }
             })
         }
@@ -817,6 +827,7 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                     state.file.outputStream().bufferedWriter(Charsets.UTF_8)
                         .use { it.write(state.content) }
                     state.onContentSaved()
+                    com.luaforge.studio.lxclua.plugin.PluginManager.notifyEvent("onFileSave", state.file.absolutePath)
                     updateFileSavedState(state.file.absolutePath, true)
                     successCount++
                 } catch (e: Exception) {
@@ -849,6 +860,7 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                     state.file.outputStream().bufferedWriter(Charsets.UTF_8)
                         .use { it.write(state.content) }
                     state.onContentSaved()
+                    com.luaforge.studio.lxclua.plugin.PluginManager.notifyEvent("onFileSave", state.file.absolutePath)
                     updateFileSavedState(state.file.absolutePath, true)
                     successCount++
                 } catch (e: Exception) {
@@ -866,6 +878,7 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                 state.file.outputStream().bufferedWriter(Charsets.UTF_8)
                     .use { it.write(state.content) }
                 state.onContentSaved()
+                com.luaforge.studio.lxclua.plugin.PluginManager.notifyEvent("onFileSave", state.file.absolutePath)
                 updateFileSavedState(state.file.absolutePath, true)
                 true
             } catch (e: Exception) {
@@ -927,6 +940,7 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                     cursorColumn = cursorColumn
                 )
             }
+            com.luaforge.studio.lxclua.plugin.PluginManager.notifyEvent("onFileOpen", file.absolutePath)
             true
         } catch (e: Exception) {
             LogCatcher.e("EditorViewModel", "打开文件内部失败: ${file.name}", e)
@@ -1117,6 +1131,7 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
     fun closeFile(indexToClose: Int) {
         if (indexToClose !in openFiles.indices) return
         val filePath = openFiles[indexToClose].file.absolutePath
+        com.luaforge.studio.lxclua.plugin.PluginManager.notifyEvent("onFileClose", filePath)
         viewModelScope.launch(KotlinDispatchers.IO) {
             stateManager.removeFileFromCurrentProject(
                 filePath
