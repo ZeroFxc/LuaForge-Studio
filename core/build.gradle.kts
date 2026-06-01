@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.luaforge.studio.core"
+    namespace = "com.luaforge.studio.lxclua.core"
     compileSdk = 36
 
     defaultConfig {

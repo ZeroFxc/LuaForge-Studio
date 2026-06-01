@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- General -->
-    <string name="app_name">LuaForge Studio</string>
+    <string name="app_name">LXC-LUA</string>
     <string name="accsibility_service_description">Accessibility Service</string>
     <string name="open_drawer">Open drawer</string>
     <string name="close_drawer">Close drawer</string>
@@ -104,7 +104,7 @@
     <string name="error_check_failed">Failed to check file: %s</string>
     <string name="unknown_error">Unknown error</string>
     <string name="file_label">File: %s</string>
-    <string name="author_note">LuaForge Studio is dedicated to providing the best mobile development experience for Lua developers, with full support for the LXCLUA 20260531 standard library and common extensions.</string>
+    <string name="author_note">LXC-LUA is dedicated to providing the best mobile development experience for Lua developers, with full support for the LXCLUA 20260531 standard library and common extensions.</string>
     <string name="build_time_label">Build time: %s</string>
     <string name="close">Close</string>
     <string name="copy">Copy</string>
@@ -126,7 +126,7 @@
     <string name="dev_nirithy_role">Developer</string>
 
     <!-- Copyright and version -->
-    <string name="copyright">© %s LuaForge Studio</string>
+    <string name="copyright">© %s LXC-LUA</string>
     <string name="version">Version %s</string>
 
     <!-- Card titles -->
@@ -178,7 +178,7 @@
     <!-- Editor Configuration -->
     <string name="settings_editor_font">Editor font</string>
     <string name="settings_select_editor_font">Select editor font</string>
-    <string name="settings_font_jetbrains_mono">JetBrains Mono</string>
+    <string name="settings_font_georgiamono_italic">Georgia Mono Italic</string>
     <string name="settings_font_fira_code">Fira Code</string>
     <string name="settings_font_custom">Custom font</string>
     <string name="settings_font_file_path">Font file path</string>

@@ -21,7 +21,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "LuaForge Studio"
+rootProject.name = "LXC-LUA"
 include(
     ":editor",
     ":app",

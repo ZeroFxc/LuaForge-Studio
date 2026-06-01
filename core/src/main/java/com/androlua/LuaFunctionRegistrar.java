@@ -5,7 +5,7 @@ import android.util.Log;
 
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.luaforge.studio.utils.LuaRecyclerAdapter;
+import com.luaforge.studio.lxclua.utils.LuaRecyclerAdapter;
 import com.luajava.JavaFunction;
 import com.luajava.LuaException;
 import com.luajava.LuaObject;
@@ -30,12 +30,12 @@ public class LuaFunctionRegistrar {
     private static final Map<String, String> UTIL_CLASS_MAP =
             new HashMap<String, String>() {
                 {
-                    put("BitmapUtil", "com.luaforge.studio.utils.BitmapUtil");
-                    put("GlideUtil", "com.luaforge.studio.utils.GlideUtil");
-                    put("OkHttpUtil", "com.luaforge.studio.utils.OkHttpUtil");
-                    put("UiUtil", "com.luaforge.studio.utils.UiUtil");
-                    put("RecyclerAdapterUtil", "com.luaforge.studio.utils.RecyclerAdapterUtil");
-                    put("ThemeUtil", "com.luaforge.studio.utils.ThemeUtil");
+                    put("BitmapUtil", "com.luaforge.studio.lxclua.utils.BitmapUtil");
+                    put("GlideUtil", "com.luaforge.studio.lxclua.utils.GlideUtil");
+                    put("OkHttpUtil", "com.luaforge.studio.lxclua.utils.OkHttpUtil");
+                    put("UiUtil", "com.luaforge.studio.lxclua.utils.UiUtil");
+                    put("RecyclerAdapterUtil", "com.luaforge.studio.lxclua.utils.RecyclerAdapterUtil");
+                    put("ThemeUtil", "com.luaforge.studio.lxclua.utils.ThemeUtil");
                 }
             };
 
@@ -277,8 +277,8 @@ public class LuaFunctionRegistrar {
                                                     @Override
                                                     public void run() {
                                                         try {
-                                                            com.luaforge.studio.utils.OkHttpUtil.HttpResponse response =
-                                                                    com.luaforge.studio.utils.OkHttpUtil.get(
+                                                            com.luaforge.studio.lxclua.utils.OkHttpUtil.HttpResponse response =
+                                                                    com.luaforge.studio.lxclua.utils.OkHttpUtil.get(
                                                                             context, // 使用传入的Context
                                                                             url,
                                                                             finalCookie,
@@ -448,8 +448,8 @@ public class LuaFunctionRegistrar {
                                                     @Override
                                                     public void run() {
                                                         try {
-                                                            com.luaforge.studio.utils.OkHttpUtil.HttpResponse response =
-                                                                    com.luaforge.studio.utils.OkHttpUtil.post(
+                                                            com.luaforge.studio.lxclua.utils.OkHttpUtil.HttpResponse response =
+                                                                    com.luaforge.studio.lxclua.utils.OkHttpUtil.post(
                                                                             context,
                                                                             url,
                                                                             finalFormData,
@@ -580,8 +580,8 @@ public class LuaFunctionRegistrar {
                                                     @Override
                                                     public void run() {
                                                         try {
-                                                            com.luaforge.studio.utils.OkHttpUtil.HttpResponse response =
-                                                                    com.luaforge.studio.utils.OkHttpUtil.download(
+                                                            com.luaforge.studio.lxclua.utils.OkHttpUtil.HttpResponse response =
+                                                                    com.luaforge.studio.lxclua.utils.OkHttpUtil.download(
                                                                             context, url, fullSavePath, finalCookie, finalHeaders);
 
                                                             ((android.app.Activity) context)
@@ -707,8 +707,8 @@ public class LuaFunctionRegistrar {
                                                     @Override
                                                     public void run() {
                                                         try {
-                                                            com.luaforge.studio.utils.OkHttpUtil.HttpResponse response =
-                                                                    com.luaforge.studio.utils.OkHttpUtil.upload(
+                                                            com.luaforge.studio.lxclua.utils.OkHttpUtil.HttpResponse response =
+                                                                    com.luaforge.studio.lxclua.utils.OkHttpUtil.upload(
                                                                             context,
                                                                             url,
                                                                             fullFilePath,
@@ -879,7 +879,7 @@ public class LuaFunctionRegistrar {
 
                         // 调用RecyclerAdapterUtil.createAdapter
                         LuaRecyclerAdapter adapter =
-                                com.luaforge.studio.utils.RecyclerAdapterUtil.createAdapter(
+                                com.luaforge.studio.lxclua.utils.RecyclerAdapterUtil.createAdapter(
                                         context,
                                         dataList,
                                         listItem,

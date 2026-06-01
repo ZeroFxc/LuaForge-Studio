@@ -6,12 +6,12 @@ plugins {
 }
 
 android {
-    namespace = "com.luaforge.studio.core"
+    namespace = "com.luaforge.studio.lxclua.core"
     compileSdk = 36
     ndkVersion = "29.0.13004108"
 
     defaultConfig {
-        applicationId = "com.luaforge.studio.core"
+        applicationId = "com.luaforge.studio.lxclua.core"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
