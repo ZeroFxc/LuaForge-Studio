@@ -6,6 +6,7 @@ import com.luaforge.studio.lxclua.langs.lua.completion.CompletionName
 import com.luaforge.studio.lxclua.langs.lua.completion.MyIdentifierAutoComplete
 import com.luaforge.studio.lxclua.langs.lua.completion.MyPrefixChecker
 import com.luaforge.studio.lxclua.langs.lua.format.LuaFormatter
+import com.luaforge.studio.lxclua.plugin.bridge.PluginCompletion
 import io.github.rosemoe.sora.lang.Language
 import io.github.rosemoe.sora.lang.QuickQuoteHandler
 import io.github.rosemoe.sora.lang.analysis.AnalyzeManager
@@ -345,6 +346,25 @@ class LuaLanguage : Language {
     }
 
     /**
+     * 添加关键字到补全系统（插件动态注入）
+     *
+     * @param keyword 关键字
+     */
+    fun addCompletionKeyword(keyword: String) {
+        autoComplete.addKeyword(keyword)
+    }
+
+    /**
+     * 添加变量类型映射到补全系统（插件动态注入）
+     *
+     * @param variableName 变量名
+     * @param className 对应的完整类名
+     */
+    fun addCompletionVariableType(variableName: String, className: String) {
+        autoComplete.mmap[variableName] = className
+    }
+
+    /**
      * 设置补全大小写敏感
      *
      * @param caseSensitive 是否大小写敏感
@@ -407,6 +427,7 @@ class LuaLanguage : Language {
         val classNameSet = androidClasses?.toSet()
         this.manager.setClassMap(classNameSet)
 
+        PluginCompletion.injectIntoAutoComplete(this.autoComplete)
     }
 
     /**

@@ -12,16 +12,6 @@ import java.util.Locale
 /**
  * 插件日志系统 API 实现
  * 
- * 使用方式:
- * - plugin.logger.debug(tag, message)  记录 DEBUG 日志
- * - plugin.logger.info(tag, message)   记录 INFO 日志
- * - plugin.logger.warn(tag, message)   记录 WARN 日志
- * - plugin.logger.error(tag, message, error) 记录 ERROR 日志
- * - plugin.logger.listLogFiles()       列出自己的日志文件
- * - plugin.logger.readLogFile(name)    读取自己的日志
- * - plugin.logger.listPluginLogFiles(otherId) 读取其他插件的日志文件列表
- * - plugin.logger.searchLogs(keyword, max)    搜索日志
- * 
  * 日志存储路径: LXC-LUA/plugins/<pluginId>/logs/YYYY-MM-DD.log
  */
 class PluginLogger(
@@ -93,8 +83,7 @@ class PluginLogger(
         return (logDir.listFiles { f -> f.isFile && f.name.endsWith(".log") }
             ?.map { it.name }
             ?.sortedDescending()
-            ?.toTypedArray()
-            ?: emptyArray())
+            ?: emptyList()).toTypedArray()
     }
 
     override fun readLogFile(filename: String): String {
@@ -140,8 +129,7 @@ class PluginLogger(
         return (logDir.listFiles { f -> f.isFile && f.name.endsWith(".log") }
             ?.map { it.name }
             ?.sortedDescending()
-            ?.toTypedArray()
-            ?: emptyArray())
+            ?: emptyList()).toTypedArray()
     }
 
     override fun readPluginLogFile(pluginId: String, filename: String): String {

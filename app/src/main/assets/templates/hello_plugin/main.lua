@@ -791,10 +791,10 @@ end)
 -- 54. 搜索日志
 plugin.menu.addQuickAction("log_search", "搜索日志", function()
     plugin.ui.showInputDialog("搜索日志", "输入关键词", "ERROR", {
-        onInput = function(keyword)
-            local results = plugin.logger.searchLogs(keyword, 20)
+        onInput = function(kw)
+            local results = plugin.logger.searchLogs(kw, 20)
             if results and #results > 0 then
-                local info = "搜索关键词: " .. keyword .. "\n" ..
+                local info = "搜索关键词: " .. kw .. "\n" ..
                              "匹配条数: " .. #results .. "\n\n"
                 for i, entry in ipairs(results) do
                     info = info .. "[" .. entry.timestamp .. "] [" .. entry.level .. "] " .. entry.message .. "\n"
@@ -975,7 +975,7 @@ plugin.menu.addQuickAction("asset_read", "读取资源内容", function()
     for i, asset in ipairs(assets) do
         table.insert(items, asset.id .. " (" .. asset.type .. ")")
     end
-    
+
     plugin.ui.showSingleChoiceDialog("选择要读取的资源", items, 0, {
         onSelect = function(index)
             local asset = assets[index + 1]
@@ -1009,7 +1009,7 @@ plugin.menu.addQuickAction("asset_unregister", "注销资源", function()
     for i, asset in ipairs(assets) do
         table.insert(items, asset.id .. " - " .. asset.displayName)
     end
-    
+
     plugin.ui.showSingleChoiceDialog("选择要注销的资源", items, 0, {
         onSelect = function(index)
             local asset = assets[index + 1]
@@ -1157,7 +1157,7 @@ plugin.menu.addQuickAction("shortcut_unregister", "注销快捷键", function()
     for i, sc in ipairs(shortcuts) do
         table.insert(items, sc.combination .. " - " .. sc.label)
     end
-    
+
     plugin.ui.showSingleChoiceDialog("选择要注销的快捷键", items, 0, {
         onSelect = function(index)
             local sc = shortcuts[index + 1]

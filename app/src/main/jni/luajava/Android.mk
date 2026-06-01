@@ -6,7 +6,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../lua \
 LOCAL_CFLAGS := -std=c17 -O3 -flto \
                 -funroll-loops -fomit-frame-pointer \
                 -ffunction-sections -fdata-sections \
-                -fstrict-aliasing
+                -fno-strict-aliasing
 
 # 针对不同 ABI 设置架构优化
 ifeq ($(TARGET_ARCH_ABI), arm64-v8a)

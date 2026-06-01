@@ -1103,8 +1103,24 @@ public class LuaState {
                 ref.push();
             else
                 pushJavaObject(ref);
+        } else if (obj.getClass().isArray()) {
+            pushJavaArrayAsTable(obj);
         } else {
             pushJavaObject(obj);
+        }
+    }
+
+    /**
+     * 将 Java 数组转换为 Lua 表并推入栈中
+     * 使用 1-based 索引，以便 Lua 的 ipairs 可以正常遍历
+     */
+    private void pushJavaArrayAsTable(Object array) throws LuaException {
+        int length = java.lang.reflect.Array.getLength(array);
+        newTable();
+        for (int i = 0; i < length; i++) {
+            Object element = java.lang.reflect.Array.get(array, i);
+            pushObjectValue(element);
+            rawSetI(-2, i + 1);
         }
     }
 

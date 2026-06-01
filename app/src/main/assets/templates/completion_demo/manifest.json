@@ -1,0 +1,16 @@
+{
+  "id": "com.example.completion_demo",
+  "name": "代码补全演示",
+  "version": "1.0.0",
+  "description": "演示 plugin.completion API 用法：关键字/包函数/变量类型/自定义补全提供器",
+  "author": "DifierLine",
+  "type": "lua",
+  "pluginType": "normal",
+  "main": "main.lua",
+  "apiVersion": 1,
+  "category": "demo",
+  "homepage": null,
+  "icon": null,
+  "dependencies": [],
+  "extendedBy": []
+}

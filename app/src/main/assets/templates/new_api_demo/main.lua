@@ -71,10 +71,10 @@ end)
 -- 1.4 快捷操作: 搜索日志
 plugin.menu.addQuickAction("log_search", "🔍 搜索日志", function()
     plugin.ui.showInputDialog("搜索日志", "输入关键词（如 ERROR, WARN）", "ERROR", {
-        onInput = function(keyword)
-            local results = plugin.logger.searchLogs(keyword, 30)
+        onInput = function(kw)
+            local results = plugin.logger.searchLogs(kw, 30)
             if results and #results > 0 then
-                local info = "搜索: " .. keyword .. "\n"
+                local info = "搜索: " .. kw .. "\n"
                 info = info .. "匹配: " .. #results .. " 条\n"
                 info = info .. "────────────────────\n\n"
                 for i, entry in ipairs(results) do
@@ -84,7 +84,7 @@ plugin.menu.addQuickAction("log_search", "🔍 搜索日志", function()
                 end
                 plugin.ui.showTextDialog("搜索结果", info)
             else
-                plugin.sys.toast("未找到包含 '" .. keyword .. "' 的日志")
+                plugin.sys.toast("未找到包含 '" .. kw .. "' 的日志")
             end
         end
     })
@@ -641,13 +641,132 @@ plugin.menu.addQuickAction("combo_info", "ℹ 插件信息", function()
     info = info .. "\n【全局资源】\n"
     info = info .. "  全局资源总数: " .. plugin.assets.getTotalAssetCount() .. " 个\n"
     info = info .. "  全局快捷键总数: " .. plugin.shortcut.getShortcutCount() .. " 个\n"
+    info = info .. "\n【通知系统】\n"
+    info = info .. "  活跃通知: " .. plugin.notification.getActiveCount() .. " 条\n"
+    info = info .. "  本插件通知: " .. plugin.notification.getMyActiveCount() .. " 条\n"
+    info = info .. "  历史通知: " .. plugin.notification.getHistoryCount() .. " 条\n"
 
     plugin.ui.showMessage("插件信息", info)
+end)
+
+-- ============================================================
+-- 第五部分: plugin.notification — 通知系统演示
+-- ============================================================
+
+-- 5.1 快捷操作: 发送 info 通知
+plugin.menu.addQuickAction("notif_info", "🔔 发送Info通知", function()
+    plugin.ui.showInputDialog("Info通知", "输入通知内容", "这是一条信息通知", {
+        onInput = function(text)
+            plugin.notification.show("信息通知", text, "info")
+            plugin.sys.toast("已发送 info 通知")
+        end
+    })
+end)
+
+-- 5.2 快捷操作: 发送 success 通知
+plugin.menu.addQuickAction("notif_success", "✅ 发送成功通知", function()
+    plugin.notification.success("操作成功", "文件已成功保存到磁盘")
+    plugin.logger.info("新API演示", "发送成功通知")
+end)
+
+-- 5.3 快捷操作: 发送 warn 通知
+plugin.menu.addQuickAction("notif_warn", "⚠ 发送警告通知", function()
+    plugin.notification.warn("内存不足", "可用内存低于 50MB，建议关闭未使用的文件")
+    plugin.logger.warn("新API演示", "发送警告通知")
+end)
+
+-- 5.4 快捷操作: 发送 error 通知
+plugin.menu.addQuickAction("notif_error", "❌ 发送错误通知", function()
+    plugin.notification.error("编译失败", "main.lua 第 42 行: 语法错误，缺少 end")
+    plugin.logger.error("新API演示", "发送错误通知", "模拟编译错误")
+end)
+
+-- 5.5 快捷操作: 分组通知演示
+plugin.menu.addQuickAction("notif_group", "📂 分组通知演示", function()
+    plugin.notification.info("构建系统", "开始编译项目...", "build")
+    plugin.notification.success("构建系统", "编译完成", "build")
+    plugin.notification.info("代码检查", "开始静态分析...", "lint")
+    plugin.notification.warn("代码检查", "发现 3 个潜在问题", "lint")
+    plugin.sys.toast("已发送 4 条分组通知 (build + lint)")
+    plugin.logger.info("新API演示", "发送分组通知: build 组 2 条 + lint 组 2 条")
+end)
+
+-- 5.6 快捷操作: 不自动消失的通知
+plugin.menu.addQuickAction("notif_sticky", "📌 置顶通知(不消失)", function()
+    plugin.ui.showInputDialog("置顶通知", "输入通知内容", "请及时处理此问题", {
+        onInput = function(text)
+            plugin.notification.show("重要提醒", text, "warn", "important", 0)
+            plugin.sys.toast("已发送置顶通知（不会自动消失）")
+        end
+    })
+end)
+
+-- 5.7 快捷操作: 仅IDE内通知（不推送系统栏）
+plugin.menu.addQuickAction("notif_ideonly", "💻 仅IDE内通知", function()
+    plugin.notification.show("IDE内部通知", "此通知仅在IDE内显示，不会推送到系统通知栏", "info", "internal", 3000, false)
+    plugin.sys.toast("已发送仅IDE内通知")
+end)
+
+-- 5.8 快捷操作: 查看通知统计
+plugin.menu.addQuickAction("notif_stats", "📊 通知统计", function()
+    local active = plugin.notification.getActiveCount()
+    local myActive = plugin.notification.getMyActiveCount()
+    local history = plugin.notification.getHistoryCount()
+
+    local info = "=== 通知系统统计 ===\n\n"
+    info = info .. "活跃通知总数: " .. active .. "\n"
+    info = info .. "本插件活跃通知: " .. myActive .. "\n"
+    info = info .. "历史通知总数: " .. history .. "\n\n"
+    info = info .. "各分组通知数:\n"
+    info = info .. "  build 组: " .. plugin.notification.getGroupCount("build") .. "\n"
+    info = info .. "  lint 组: " .. plugin.notification.getGroupCount("lint") .. "\n"
+    info = info .. "  important 组: " .. plugin.notification.getGroupCount("important") .. "\n"
+
+    plugin.ui.showMessage("通知统计", info)
+end)
+
+-- 5.9 快捷操作: 清除本插件通知
+plugin.menu.addQuickAction("notif_clear", "🗑 清除本插件通知", function()
+    local count = plugin.notification.getMyActiveCount()
+    plugin.notification.clear()
+    plugin.sys.toast("已清除 " .. count .. " 条通知")
+    plugin.logger.info("新API演示", "清除本插件通知: " .. count .. " 条")
+end)
+
+-- 5.10 快捷操作: 清除所有通知
+plugin.menu.addQuickAction("notif_clearall", "🗑 清除所有通知", function()
+    local count = plugin.notification.getActiveCount()
+    plugin.ui.showConfirm("清除所有通知", "确定要清除全部 " .. count .. " 条活跃通知吗？", function()
+        plugin.notification.clearAll()
+        plugin.sys.toast("已清除所有通知")
+        plugin.logger.info("新API演示", "清除所有通知")
+    end, nil)
+end)
+
+-- 5.11 快捷操作: 清除历史通知
+plugin.menu.addQuickAction("notif_clearhistory", "🧹 清除历史通知", function()
+    local count = plugin.notification.getHistoryCount()
+    plugin.notification.clearAllHistory()
+    plugin.sys.toast("已清除 " .. count .. " 条历史通知")
+    plugin.logger.info("新API演示", "清除历史通知: " .. count .. " 条")
+end)
+
+-- 5.12 快捷操作: 完整通知流程演示
+plugin.menu.addQuickAction("notif_demo", "🎬 完整通知流程演示", function()
+    plugin.notification.info("流程演示", "步骤 1/4: 开始处理任务...", "demo")
+    plugin.logger.info("新API演示", "演示流程开始")
+
+    plugin.notification.success("流程演示", "步骤 2/4: 数据加载完成", "demo")
+    plugin.notification.warn("流程演示", "步骤 3/4: 检测到异常配置，已自动修正", "demo")
+    plugin.notification.error("流程演示", "步骤 4/4: 部分文件处理失败，请检查日志", "demo")
+
+    plugin.sys.toast("完整通知流程演示完成，请查看通知中心")
+    plugin.logger.info("新API演示", "演示流程完成，共发送 4 条通知")
 end)
 
 -- ============================================================
 -- 初始化完成
 -- ============================================================
 plugin.logger.info("新API演示", "插件初始化完成")
-plugin.logger.info("新API演示", "已注册 4 个快捷键 + " .. (entryRegistered and "1 个自动资源" or "0 个资源") .. " + 17 个快捷操作菜单")
+plugin.logger.info("新API演示", "已注册 4 个快捷键 + " .. (entryRegistered and "1 个自动资源" or "0 个资源") .. " + 29 个快捷操作菜单 (含通知系统 12 个)")
 plugin.sys.toast("新API演示插件已加载 ✓")

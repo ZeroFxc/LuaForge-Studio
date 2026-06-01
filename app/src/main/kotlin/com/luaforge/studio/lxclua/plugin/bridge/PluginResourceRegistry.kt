@@ -7,17 +7,7 @@ import java.io.File
 /**
  * 插件资源注册表实现
  * 
- * 使用方式:
- * - plugin.assets.register(key, type, path, name, desc, public, meta)  注册资源
- * - plugin.assets.unregister(key)       注销资源
- * - plugin.assets.getMyAssets()         获取自己的资源
- * - plugin.assets.getAllPublicAssets()  获取所有公开资源
- * - plugin.assets.getAssetsByType(type) 按类型筛选
- * - plugin.assets.readAssetBytes(id)    读取资源二进制
- * - plugin.assets.readAssetText(id)     读取资源文本
- * 
  * 全局资源 ID 格式: pluginId/resourceKey
- * 
  * 资源注册表是全局单例的，所有插件共享同一张表。
  */
 class PluginResourceRegistry(private val pluginId: String) : IPluginBridgeResourceRegistry {
@@ -78,7 +68,7 @@ class PluginResourceRegistry(private val pluginId: String) : IPluginBridgeResour
     }
 
     override fun getMyAssets(): Array<RegisteredResource> {
-        return registry.values.filter { it.pluginId == pluginId }.toTypedArray()
+        return registry.values.filter { it.pluginId == pluginId }.toList().toTypedArray()
     }
 
     override fun getAsset(globalId: String): RegisteredResource? {
@@ -92,20 +82,20 @@ class PluginResourceRegistry(private val pluginId: String) : IPluginBridgeResour
     override fun getAllPublicAssets(): Array<RegisteredResource> {
         return registry.values.filter {
             it.isPublic || it.pluginId == pluginId
-        }.toTypedArray()
+        }.toList().toTypedArray()
     }
 
     override fun getAssetsByType(type: String): Array<RegisteredResource> {
         val lowerType = type.lowercase()
         return registry.values.filter {
             (it.isPublic || it.pluginId == pluginId) && it.type == lowerType
-        }.toTypedArray()
+        }.toList().toTypedArray()
     }
 
     override fun getPluginAssets(pluginId: String): Array<RegisteredResource> {
         return registry.values.filter {
             it.pluginId == pluginId && (it.isPublic || pluginId == this.pluginId)
-        }.toTypedArray()
+        }.toList().toTypedArray()
     }
 
     override fun readAssetBytes(globalId: String): ByteArray? {

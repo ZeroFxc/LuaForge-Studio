@@ -24,6 +24,7 @@ import java.io.File
  * - plugin.menu: 菜单管理
  * - plugin.clipboard: 剪贴板操作
  * - plugin.http: 网络请求
+ * - plugin.completion: 代码补全扩展（关键字/包函数/变量类型/自定义提供器）
  */
 object LuaPluginLoader {
     

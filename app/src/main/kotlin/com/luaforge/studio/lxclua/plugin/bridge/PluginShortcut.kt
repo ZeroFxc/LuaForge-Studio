@@ -2,7 +2,6 @@ package com.luaforge.studio.lxclua.plugin.bridge
 
 import android.view.KeyEvent
 import com.luaforge.studio.lxclua.plugin.PluginManager
-import com.luaforge.studio.lxclua.plugin.api.IPluginBridgeShortcut
 import com.luaforge.studio.lxclua.plugin.data.ShortcutInfo
 import com.luajava.LuaFunction
 import io.github.rosemoe.sora.event.EditorKeyEvent
@@ -11,18 +10,8 @@ import io.github.rosemoe.sora.widget.CodeEditor
 
 /**
  * 插件快捷键绑定系统实现
- * 
- * 使用 sora-editor 的 EditorKeyEvent 事件系统拦截按键，
- * 匹配已注册的快捷键组合后触发插件回调。
- * 
- * 组合键格式: "Ctrl+S", "Ctrl+Shift+Z", "Alt+Enter", "Ctrl+Alt+F" 等
- * 
- * 使用方式:
- * - plugin.shortcut.register("my_key", "Ctrl+S", "保存", callback)
- * - plugin.shortcut.unregister("my_key")
- * - plugin.shortcut.isCombinationTaken("Ctrl+S")
  */
-class PluginShortcut(private val pluginId: String) : IPluginBridgeShortcut {
+class PluginShortcut(private val pluginId: String) {
 
     companion object {
         private val shortcuts = mutableMapOf<String, ShortcutInfo>()
@@ -116,12 +105,9 @@ class PluginShortcut(private val pluginId: String) : IPluginBridgeShortcut {
             return keysToRemove.size
         }
 
-        private fun ensureSubscribed() {
+        fun ensureSubscribed() {
             val editor = PluginManager.activeViewModel?.getActiveEditor()
             if (editor == null) {
-                currentReceipt?.unsubscribe()
-                currentReceipt = null
-                subscribedEditor = null
                 return
             }
 
@@ -160,7 +146,7 @@ class PluginShortcut(private val pluginId: String) : IPluginBridgeShortcut {
 
     private fun makeGlobalId(key: String): String = "$pluginId/$key"
 
-    override fun register(
+    fun register(
         key: String,
         combination: String,
         label: String,
@@ -192,25 +178,29 @@ class PluginShortcut(private val pluginId: String) : IPluginBridgeShortcut {
         return globalId
     }
 
-    override fun register(key: String, combination: String, label: String, callback: Any): String? {
+    fun register(key: String, combination: String, label: String, callback: Any): String? {
         return register(key, combination, label, "", callback, true)
     }
 
-    override fun unregister(key: String): Boolean {
+    fun register(key: String, combination: String, label: String, callback: Any, editorOnly: Boolean): String? {
+        return register(key, combination, label, "", callback, editorOnly)
+    }
+
+    fun unregister(key: String): Boolean {
         val globalId = makeGlobalId(key)
         callbacks.remove(globalId)
         return shortcuts.remove(globalId) != null
     }
 
-    override fun unregisterAll(): Int {
+    fun unregisterAll(): Int {
         return Companion.removeAllPluginShortcuts(pluginId)
     }
 
-    override fun getMyShortcuts(): Array<ShortcutInfo> {
-        return shortcuts.values.filter { it.pluginId == pluginId }.toTypedArray()
+    fun getMyShortcuts(): Array<ShortcutInfo> {
+        return shortcuts.values.filter { it.pluginId == pluginId }.toList().toTypedArray()
     }
 
-    override fun getShortcut(globalId: String): ShortcutInfo? {
+    fun getShortcut(globalId: String): ShortcutInfo? {
         return if (globalId.contains("/")) {
             shortcuts[globalId]
         } else {
@@ -218,17 +208,17 @@ class PluginShortcut(private val pluginId: String) : IPluginBridgeShortcut {
         }
     }
 
-    override fun getAllShortcuts(): Array<ShortcutInfo> {
-        return shortcuts.values.toTypedArray()
+    fun getAllShortcuts(): Array<ShortcutInfo> {
+        return shortcuts.values.toList().toTypedArray()
     }
 
-    override fun isCombinationTaken(combination: String): ShortcutInfo? {
+    fun isCombinationTaken(combination: String): ShortcutInfo? {
         val parsed = Companion.parseCombination(combination) ?: return null
         val (mods, keyCode) = parsed
         return shortcuts.values.find { it.modifiers == mods && it.keyCode == keyCode }
     }
 
-    override fun getShortcutCount(): Int {
+    fun getShortcutCount(): Int {
         return shortcuts.size
     }
 }

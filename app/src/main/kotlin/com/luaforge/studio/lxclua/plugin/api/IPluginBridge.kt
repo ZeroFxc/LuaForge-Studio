@@ -21,7 +21,8 @@ interface IPluginBridge :
     IPluginBridgeLua,
     IPluginBridgeLogger,
     IPluginBridgeResourceRegistry,
-    IPluginBridgeShortcut {
+    IPluginBridgeShortcut,
+    IPluginBridgeCompletion {
     
     // ==================== 基础功能 ====================
     

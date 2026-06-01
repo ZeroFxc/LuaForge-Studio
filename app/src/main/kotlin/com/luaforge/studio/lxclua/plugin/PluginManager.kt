@@ -220,7 +220,7 @@ object PluginManager {
                 try {
                     val content = manifestFile.readText()
                     val manifest = Gson().fromJson(content, PluginManifest::class.java)
-                    val enabled = prefs.getBoolean(PREF_ENABLED_PREFIX + manifest.id, true)
+                    val enabled = prefs.getBoolean(PREF_ENABLED_PREFIX + manifest.id, false)
                     
                     // 保留已加载插件的运行状态
                     val existing = loadedPlugins.find { it.manifest.id == manifest.id }
@@ -430,6 +430,12 @@ object PluginManager {
         
         // 移除注册的快捷键
         com.luaforge.studio.lxclua.plugin.bridge.PluginShortcut.removeAllPluginShortcuts(pluginId)
+        
+        // 移除注册的补全数据
+        com.luaforge.studio.lxclua.plugin.bridge.PluginCompletion.removeAllPluginCompletionData(pluginId)
+        
+        // 移除通知
+        com.luaforge.studio.lxclua.plugin.state.NotificationState.dismissPluginNotifications(pluginId)
     }
     
     /**

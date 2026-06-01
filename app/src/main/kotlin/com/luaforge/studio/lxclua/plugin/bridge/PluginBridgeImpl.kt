@@ -55,6 +55,10 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
         PluginShortcut(pluginId)
     }
     
+    private val completionBridge by lazy {
+        PluginCompletion(pluginId)
+    }
+    
     // ==================== 基础功能 ====================
     
     override fun toast(message: String) {
@@ -1124,6 +1128,10 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
         return shortcutBridge.register(key, combination, label, callback)
     }
     
+    override fun register(key: String, combination: String, label: String, callback: Any, editorOnly: Boolean): String? {
+        return shortcutBridge.register(key, combination, label, callback, editorOnly)
+    }
+    
     override fun unregister(key: String): Boolean {
         return shortcutBridge.unregister(key)
     }
@@ -1150,5 +1158,63 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
     
     override fun getShortcutCount(): Int {
         return shortcutBridge.getShortcutCount()
+    }
+    
+    // ==================== 代码补全扩展 ====================
+    
+    override fun addKeyword(keyword: String): Boolean {
+        return completionBridge.addKeyword(keyword)
+    }
+    
+    override fun addKeywords(keywords: Array<String>): Int {
+        return completionBridge.addKeywords(keywords)
+    }
+    
+    override fun removeKeyword(keyword: String): Boolean {
+        return completionBridge.removeKeyword(keyword)
+    }
+    
+    override fun addPackage(packageName: String, functions: Array<String>): Boolean {
+        return completionBridge.addPackage(packageName, functions)
+    }
+    
+    override fun removePackage(packageName: String): Boolean {
+        return completionBridge.removePackage(packageName)
+    }
+    
+    override fun addVariableType(variableName: String, className: String): Boolean {
+        return completionBridge.addVariableType(variableName, className)
+    }
+    
+    override fun removeVariableType(variableName: String): Boolean {
+        return completionBridge.removeVariableType(variableName)
+    }
+    
+    override fun registerProvider(language: String, callback: Any): String? {
+        return completionBridge.registerProvider(language, callback)
+    }
+    
+    override fun unregisterProvider(providerId: String): Boolean {
+        return completionBridge.unregisterProvider(providerId)
+    }
+    
+    override fun clearMyKeywords(): Int {
+        return completionBridge.clearMyKeywords()
+    }
+    
+    override fun clearMyPackages(): Int {
+        return completionBridge.clearMyPackages()
+    }
+    
+    override fun clearMyVariableTypes(): Int {
+        return completionBridge.clearMyVariableTypes()
+    }
+    
+    override fun clearMyProviders(): Int {
+        return completionBridge.clearMyProviders()
+    }
+    
+    override fun clearAll(): Array<Int> {
+        return completionBridge.clearAll()
     }
 }
