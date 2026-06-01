@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -95,6 +96,8 @@ import com.luaforge.studio.lxclua.ui.components.ColorPickerDialog
 import com.luaforge.studio.lxclua.ui.theme.ThemeType
 import com.luaforge.studio.lxclua.utils.IconManager
 import com.luaforge.studio.lxclua.utils.NonBlockingToastState
+import com.luaforge.studio.lxclua.plugin.state.PluginSettingsState
+import com.luaforge.studio.lxclua.plugin.state.PluginSettingsItem
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -1345,6 +1348,28 @@ SettingsListItem(
                     }
                 }
             }
+
+            // 插件扩展设置
+            val pluginSections = PluginSettingsState.getSortedSections()
+                .filter { section -> PluginSettingsState.getItemsBySection(section.key).isNotEmpty() }
+
+            if (pluginSections.isNotEmpty()) {
+                items(pluginSections, key = { section -> section.key }) { section ->
+                    val sectionItems = PluginSettingsState.getItemsBySection(section.key)
+                    var pluginExpanded by remember { mutableStateOf(false) }
+
+                    SettingsCardGroup(
+                        title = section.title,
+                        icon = Icons.Filled.Settings,
+                        initiallyExpanded = pluginExpanded,
+                        onExpandedChange = { expanded -> pluginExpanded = expanded }
+                    ) {
+                        sectionItems.forEach { item ->
+                                PluginSettingsItemRow(item = item)
+                            }
+                    }
+                }
+            }
         }
     }
 
@@ -1746,6 +1771,42 @@ fun ThemeColorOption(
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun PluginSettingsItemRow(item: PluginSettingsItem) {
+    var switchState by remember { mutableStateOf(item.initialValue) }
+
+    when (item.type) {
+        PluginSettingsState.TYPE_SWITCH -> {
+            SettingsListItem(
+                title = item.title,
+                subtitle = item.subtitle,
+                trailingContent = {
+                    Switch(
+                        checked = switchState,
+                        onCheckedChange = { newValue ->
+                            switchState = newValue
+                            item.onChange?.invoke(newValue)
+                        }
+                    )
+                },
+                onClick = {
+                    switchState = !switchState
+                    item.onChange?.invoke(switchState)
+                }
+            )
+        }
+        PluginSettingsState.TYPE_BUTTON -> {
+            SettingsListItem(
+                title = item.title,
+                subtitle = item.subtitle,
+                onClick = {
+                    item.onClick?.invoke()
+                }
             )
         }
     }

@@ -42,6 +42,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.luaforge.studio.lxclua.R
+import com.luaforge.studio.lxclua.plugin.PluginManager
 import com.luaforge.studio.lxclua.ui.editor.viewmodel.EditorViewModel
 import com.luaforge.studio.lxclua.ui.settings.SettingsManager
 import com.luaforge.studio.lxclua.utils.NonBlockingToastState
@@ -177,19 +178,24 @@ fun DraggableSymbolPanel(
             }
 
             // 底部区域
-            Column(modifier = Modifier.fillMaxWidth()) {
-                HorizontalDivider(
-                    thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
-                )
-
-                Box(
+            val bottomItems = PluginManager.bottomPanelItems
+            if (bottomItems.isNotEmpty()) {
+                PluginBottomPanelContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                ) {
+                )
+            } else {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+                    )
+
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -520,6 +526,106 @@ private fun SymbolButton(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
+        }
+    }
+}
+
+@Composable
+private fun PluginBottomPanelContent(modifier: Modifier = Modifier) {
+    val items = PluginManager.bottomPanelItems
+    val activeKey = PluginManager.activeBottomPanelKey.value
+    val activeItem = items.find { it.key == activeKey }
+
+    Column(modifier = modifier) {
+        HorizontalDivider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+        )
+
+        if (items.size > 1) {
+            ScrollableTabRow(
+                selectedTabIndex = items.indexOfFirst { it.key == activeKey }.coerceAtLeast(0),
+                modifier = Modifier.fillMaxWidth(),
+                edgePadding = 0.dp,
+                divider = {}
+            ) {
+                items.forEach { item ->
+                    Tab(
+                        selected = item.key == activeKey,
+                        onClick = { PluginManager.activeBottomPanelKey.value = item.key },
+                        text = {
+                            Text(
+                                text = item.title,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        if (activeItem != null) {
+            BottomPanelElementList(
+                elements = activeItem.elements,
+                onEvent = activeItem.onEvent,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomPanelElementList(
+    elements: List<PluginManager.BottomPanelElement>,
+    onEvent: Runnable?,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        items(elements.size) { index ->
+            val element = elements[index]
+            when (element.type) {
+                "text" -> {
+                    Text(
+                        text = element.value ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+                "section" -> {
+                    Text(
+                        text = element.value ?: "",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(vertical = 6.dp)
+                    )
+                }
+                "button" -> {
+                    OutlinedButton(
+                        onClick = {
+                            onEvent?.run()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = element.value ?: element.id ?: "",
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1
+                        )
+                    }
+                }
+                "spacer" -> {
+                    Spacer(modifier = Modifier.height((element.height.coerceAtLeast(4f)).dp))
+                }
+            }
         }
     }
 }

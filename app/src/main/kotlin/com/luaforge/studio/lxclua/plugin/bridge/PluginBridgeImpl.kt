@@ -569,7 +569,96 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
             override fun isShowing(): Boolean = false
         }
     }
-    
+
+    override fun showFileListDialog(title: String, directoryPath: String, filter: String?, onSelect: OnInputCallback) {
+        handler.post {
+            PluginManager.currentDialog.value = PluginManager.DialogState.FileList(
+                title = title,
+                directoryPath = directoryPath,
+                filter = filter,
+                onSelect = { path ->
+                    PluginManager.currentDialog.value = null
+                    onSelect.onInput(path)
+                },
+                onDismiss = { PluginManager.currentDialog.value = null }
+            )
+        }
+    }
+
+    override fun showImageDialog(title: String, imagePath: String) {
+        handler.post {
+            PluginManager.currentDialog.value = PluginManager.DialogState.ImageDisplay(
+                title = title,
+                imagePath = imagePath,
+                onDismiss = { PluginManager.currentDialog.value = null }
+            )
+        }
+    }
+
+    override fun showTextDialog(title: String, text: String) {
+        handler.post {
+            PluginManager.currentDialog.value = PluginManager.DialogState.TextDisplay(
+                title = title,
+                text = text,
+                onDismiss = { PluginManager.currentDialog.value = null }
+            )
+        }
+    }
+
+    override fun showCheckboxDialog(title: String, message: String, checked: Boolean, onConfirm: OnSelectCallback) {
+        handler.post {
+            PluginManager.currentDialog.value = PluginManager.DialogState.Checkbox(
+                title = title,
+                message = message,
+                checked = checked,
+                onConfirm = { result ->
+                    PluginManager.currentDialog.value = null
+                    onConfirm.onSelect(if (result) 1 else 0)
+                },
+                onDismiss = { PluginManager.currentDialog.value = null }
+            )
+        }
+    }
+
+    override fun addBottomPanelItem(pluginId: String, key: String, title: String, elements: List<PluginManager.BottomPanelElement>, onEvent: Runnable?) {
+        handler.post {
+            val item = PluginManager.BottomPanelItem(
+                pluginId = pluginId,
+                key = key,
+                title = title,
+                elements = elements,
+                onEvent = onEvent
+            )
+            val existingIndex = PluginManager.bottomPanelItems.indexOfFirst { it.key == key }
+            if (existingIndex >= 0) {
+                PluginManager.bottomPanelItems[existingIndex] = item
+            } else {
+                PluginManager.bottomPanelItems.add(item)
+            }
+            if (PluginManager.activeBottomPanelKey.value == null) {
+                PluginManager.activeBottomPanelKey.value = key
+            }
+        }
+    }
+
+    override fun removeBottomPanelItem(key: String) {
+        handler.post {
+            PluginManager.bottomPanelItems.removeAll { it.key == key }
+            if (PluginManager.activeBottomPanelKey.value == key) {
+                PluginManager.activeBottomPanelKey.value = PluginManager.bottomPanelItems.firstOrNull()?.key
+            }
+        }
+    }
+
+    override fun clearBottomPanelItems(pluginId: String) {
+        handler.post {
+            PluginManager.bottomPanelItems.removeAll { it.pluginId == pluginId }
+            if (PluginManager.bottomPanelItems.none { it.key == PluginManager.activeBottomPanelKey.value }) {
+                PluginManager.activeBottomPanelKey.value = PluginManager.bottomPanelItems.firstOrNull()?.key
+            }
+        }
+    }
+
     // ==================== Java 反射调用 ====================
     
     override fun loadClass(className: String): Class<*>? {

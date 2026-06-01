@@ -13,6 +13,8 @@ interface IPluginBridgeEvents {
      * - onTextChanged: 文本变化时触发，参数: (filePath, newContent)
      * - onEditorInit: 编辑器初始化时触发，参数: (projectPath)
      * - onEditorClose: 编辑器关闭时触发，参数: (projectPath)
+     * - onProjectLongPress: 主页项目长按时触发，参数: (projectId, projectName, projectPath)
+     * - onProjectClick: 主页项目点击时触发，参数: (projectId, projectName, projectPath)
      */
     fun registerEventListener(eventName: String, listener: Any)
     

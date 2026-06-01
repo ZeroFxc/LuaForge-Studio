@@ -28,12 +28,15 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -50,7 +53,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -63,6 +68,12 @@ import androidx.core.view.WindowCompat
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.lifecycleScope
 import coil.compose.SubcomposeAsyncImage
+import com.luaforge.studio.lxclua.plugin.PluginManager
+import com.luaforge.studio.lxclua.plugin.bridge.PluginNavigation
+import com.luaforge.studio.lxclua.plugin.state.EventManager
+import com.luaforge.studio.lxclua.plugin.state.NavigationState
+import com.luaforge.studio.lxclua.plugin.state.PluginEvents
+import com.luaforge.studio.lxclua.plugin.state.SidebarItem
 import com.luaforge.studio.lxclua.ui.editor.persistence.EditorStateUtil
 import com.luaforge.studio.lxclua.ui.about.AboutScreen
 import com.luaforge.studio.lxclua.ui.components.FilePickerDialog
@@ -330,6 +341,20 @@ fun MainScreen(
 
     // 用于处理从设置/关于页返回时的异步操作
     var shouldReturnToProjects by remember { mutableStateOf(false) }
+
+    // 多选模式状态（从 PluginManager 读取）
+    val isMultiSelectMode by remember { PluginManager.isMultiSelectMode }
+    val multiSelectedProjectIds = PluginManager.multiSelectedProjectIds
+    
+    // 项目徽章和菜单扩展状态
+    val projectBadges = PluginManager.projectBadges
+    val projectCardMenuItems = PluginManager.projectCardMenuItems
+    
+    // 同步项目列表到 PluginManager 供插件读取
+    LaunchedEffect(projectItems) {
+        PluginManager.currentProjectItems.clear()
+        PluginManager.currentProjectItems.addAll(projectItems)
+    }
 
     // 监听返回标志，处理从设置/关于页返回时的异步操作
     LaunchedEffect(shouldReturnToProjects) {
@@ -613,199 +638,33 @@ fun MainScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet(
-                modifier = Modifier.widthIn(max = 280.dp),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 32.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            Icons.Filled.Code,
-                            contentDescription = stringResource(R.string.cd_logo),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
+            AppDrawerContent(
+                currentContentType = currentContentType,
+                onContentTypeChange = { type ->
+                    currentContentType = type
+                    scope.launch { drawerState.close() }
+                },
+                copyrightYear = copyrightYear,
+                appVersionName = appVersionName
+            )
 
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    NavigationDrawerItem(
-                        label = {
-                            Text(stringResource(R.string.projects), fontWeight = FontWeight.Medium)
-                        },
-                        selected = currentContentType == MainContentType.PROJECTS,
-                        onClick = {
-                            currentContentType = MainContentType.PROJECTS
-                            scope.launch { drawerState.close() }
-                        },
-                        icon = {
-                            Icon(
-                                Icons.Filled.Folder,
-                                contentDescription = stringResource(R.string.cd_project_folder),
-                                tint = if (currentContentType == MainContentType.PROJECTS)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        colors = NavigationDrawerItemDefaults.colors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedContainerColor = Color.Transparent,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-
-                    NavigationDrawerItem(
-                        label = {
-                            Text(stringResource(R.string.settings), fontWeight = FontWeight.Medium)
-                        },
-                        selected = currentContentType == MainContentType.SETTINGS,
-                        onClick = {
-                            currentContentType = MainContentType.SETTINGS
-                            scope.launch { drawerState.close() }
-                        },
-                        icon = {
-                            Icon(
-                                Icons.Filled.Settings,
-                                contentDescription = stringResource(R.string.settings),
-                                tint = if (currentContentType == MainContentType.SETTINGS)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        colors = NavigationDrawerItemDefaults.colors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedContainerColor = Color.Transparent,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-
-                    NavigationDrawerItem(
-                        label = {
-                            Text(stringResource(R.string.about), fontWeight = FontWeight.Medium)
-                        },
-                        selected = currentContentType == MainContentType.ABOUT,
-                        onClick = {
-                            currentContentType = MainContentType.ABOUT
-                            scope.launch { drawerState.close() }
-                        },
-                        icon = {
-                            Icon(
-                                Icons.Filled.Info,
-                                contentDescription = stringResource(R.string.about),
-                                tint = if (currentContentType == MainContentType.ABOUT)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        colors = NavigationDrawerItemDefaults.colors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedContainerColor = Color.Transparent,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-
-                    NavigationDrawerItem(
-                        label = {
-                            Text("插件管理", fontWeight = FontWeight.Medium)
-                        },
-                        selected = currentContentType == MainContentType.PLUGINS,
-                        onClick = {
-                            currentContentType = MainContentType.PLUGINS
-                            scope.launch { drawerState.close() }
-                        },
-                        icon = {
-                            Icon(
-                                Icons.Filled.Extension,
-                                contentDescription = "插件管理",
-                                tint = if (currentContentType == MainContentType.PLUGINS)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        colors = NavigationDrawerItemDefaults.colors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedContainerColor = Color.Transparent,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                )
-                Column(
-                    modifier = Modifier.padding(24.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.copyright, copyrightYear),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = stringResource(R.string.version, appVersionName),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+            // 监听 NavigationState.sidebarOpen 的变化，让宿主 drawer 与插件 API 保持同步
+            val sidebarOpenFromPlugin = NavigationState.sidebarOpen.value
+            LaunchedEffect(sidebarOpenFromPlugin) {
+                if (sidebarOpenFromPlugin && drawerState.isClosed) {
+                    drawerState.open()
+                    NavigationState.sidebarOpen.value = false
                 }
             }
         }
     ) {
         BackHandler(
-            enabled = currentContentType != MainContentType.PROJECTS || drawerState.isOpen,
+            enabled = isMultiSelectMode || currentContentType != MainContentType.PROJECTS || drawerState.isOpen,
             onBack = {
                 scope.launch {
-                    if (drawerState.isOpen) {
+                    if (isMultiSelectMode) {
+                        EventManager.fireEvent(PluginEvents.ON_BACK_PRESSED)
+                    } else if (drawerState.isOpen) {
                         drawerState.close()
                     } else if (currentContentType != MainContentType.PROJECTS) {
                         shouldReturnToProjects = true
@@ -859,7 +718,7 @@ fun MainScreen(
                                     MainContentType.PROJECTS -> stringResource(R.string.app_name)
                                     MainContentType.SETTINGS -> stringResource(R.string.settings)
                                     MainContentType.ABOUT -> stringResource(R.string.about)
-                                    MainContentType.PLUGINS -> "插件管理"
+                                    MainContentType.PLUGINS -> stringResource(R.string.drawer_plugin_management)
                                 },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -1096,7 +955,38 @@ fun MainScreen(
                                                     showDeleteDialog = true
                                                 },
                                                 onShareClick = { shareProject(project) },
-                                                onClick = { onNavigateToEditor(project) },
+                                                onClick = {
+                                                    if (isMultiSelectMode) {
+                                                        EventManager.fireEvent(
+                                                            PluginEvents.ON_PROJECT_CLICK,
+                                                            project.id, project.name, project.path
+                                                        )
+                                                    } else {
+                                                        onNavigateToEditor(project)
+                                                    }
+                                                },
+                                                onLongClick = {
+                                                    EventManager.fireEvent(
+                                                        PluginEvents.ON_PROJECT_LONG_PRESS,
+                                                        project.id, project.name, project.path
+                                                    )
+                                                },
+                                                isSelectedInMultiSelect = isMultiSelectMode && project.id in multiSelectedProjectIds,
+                                                isMultiSelectMode = isMultiSelectMode,
+                                                badge = projectBadges[project.id],
+                                                extraMenuItems = projectCardMenuItems.toList(),
+                                                onSwipeLeft = {
+                                                    EventManager.fireEvent(
+                                                        PluginEvents.ON_PROJECT_SWIPE_LEFT,
+                                                        project.id, project.name, project.path
+                                                    )
+                                                },
+                                                onSwipeRight = {
+                                                    EventManager.fireEvent(
+                                                        PluginEvents.ON_PROJECT_SWIPE_RIGHT,
+                                                        project.id, project.name, project.path
+                                                    )
+                                                },
                                                 modifier = Modifier.animateItem()
                                             )
                                         }
@@ -1443,6 +1333,13 @@ fun ProjectCard(
     onDeleteClick: () -> Unit,
     onShareClick: () -> Unit,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    onSwipeLeft: (() -> Unit)? = null,
+    onSwipeRight: (() -> Unit)? = null,
+    isMultiSelectMode: Boolean = false,
+    isSelectedInMultiSelect: Boolean = false,
+    badge: PluginManager.BadgeInfo? = null,
+    extraMenuItems: List<PluginManager.ProjectCardMenuItem> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -1490,12 +1387,33 @@ fun ProjectCard(
     }
 
     Card(
-        modifier = modifier,
+        modifier = modifier
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .pointerInput(Unit) {
+                if (onSwipeLeft != null || onSwipeRight != null) {
+                    var totalDrag = 0f
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (totalDrag < -100f) onSwipeLeft?.invoke()
+                            else if (totalDrag > 100f) onSwipeRight?.invoke()
+                            totalDrag = 0f
+                        },
+                        onDragCancel = { totalDrag = 0f },
+                        onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                        onDragStart = { totalDrag = 0f }
+                    )
+                }
+            },
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = colorScheme.surfaceContainerLow
+            containerColor = if (isMultiSelectMode && isSelectedInMultiSelect)
+                colorScheme.primaryContainer
+            else
+                colorScheme.surfaceContainerLow
         ),
-        onClick = onClick,
         elevation = CardDefaults.cardElevation(
             defaultElevation = 0.dp,
             pressedElevation = 1.dp
@@ -1524,6 +1442,14 @@ fun ProjectCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
+                        if (isMultiSelectMode) {
+                            Checkbox(
+                                checked = isSelectedInMultiSelect,
+                                onCheckedChange = null,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
@@ -1611,6 +1537,23 @@ fun ProjectCard(
                         }
                     }
 
+                    badge?.let { bdg ->
+                        val badgeColor = Color(bdg.color.toULong())
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = badgeColor.copy(alpha = 0.15f),
+                            contentColor = badgeColor
+                        ) {
+                            Text(
+                                text = bdg.text,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Row(
@@ -1687,6 +1630,22 @@ fun ProjectCard(
                                         )
                                     }
                                 )
+
+                                extraMenuItems.forEach { item ->
+                                    DropdownMenuItem(
+                                        text = { Text(item.label) },
+                                        onClick = {
+                                            showMenu = false
+                                            item.onClick(project.id, project.name, project.path)
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Filled.Extension,
+                                                contentDescription = null
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -1751,6 +1710,324 @@ fun DefaultProjectIcon() {
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(24.dp)
         )
+    }
+}
+
+/**
+ * 宿主侧滑栏内容
+ *
+ * 渲染基础导航项（项目/设置/关于/插件管理）以及插件通过 PluginNavigation 注册的侧滑栏菜单项。
+ * 插件项的 group 字段决定它们被插入到哪个分组：
+ *  - "project"  -> 项目分组内
+ *  - "settings" -> 设置分组内
+ *  - "about"    -> 关于分组内
+ *  - "plugins"  -> 插件管理分组内
+ *  - "custom"   -> 独立的"自定义"分组（位于插件管理之后）
+ *  - 其他       -> 自定义分组
+ *
+ * 插件侧滑栏项通过 NavigationState.pluginSidebarItems 响应式注册，列表变化会触发重组。
+ */
+@Composable
+fun AppDrawerContent(
+    currentContentType: MainContentType,
+    onContentTypeChange: (MainContentType) -> Unit,
+    copyrightYear: String,
+    appVersionName: String
+) {
+    ModalDrawerSheet(
+        modifier = Modifier.widthIn(max = 280.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 32.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Code,
+                    contentDescription = stringResource(R.string.cd_logo),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 24.dp),
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 读取插件侧滑栏项，使 Compose 跟踪其变化
+        val pluginItems = NavigationState.pluginSidebarItems
+        val projectPluginItems = pluginItems.filter { it.group == PluginNavigation.TYPE_PROJECT }
+        val settingsPluginItems = pluginItems.filter { it.group == PluginNavigation.TYPE_SETTINGS }
+        val aboutPluginItems = pluginItems.filter { it.group == PluginNavigation.TYPE_ABOUT }
+        val pluginsPluginItems = pluginItems.filter { it.group == PluginNavigation.TYPE_PLUGINS }
+        val customPluginItems = pluginItems.filter { it.group == PluginNavigation.TYPE_CUSTOM }
+
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // ============ 项目分组 ============
+            BaseDrawerItem(
+                label = stringResource(R.string.projects),
+                icon = Icons.Filled.Folder,
+                iconContentDescription = stringResource(R.string.cd_project_folder),
+                selected = currentContentType == MainContentType.PROJECTS,
+                onClick = { onContentTypeChange(MainContentType.PROJECTS) }
+            )
+            for (item in projectPluginItems) {
+                PluginSidebarDrawerItem(item = item)
+            }
+
+            // ============ 设置分组 ============
+            BaseDrawerItem(
+                label = stringResource(R.string.settings),
+                icon = Icons.Filled.Settings,
+                iconContentDescription = stringResource(R.string.settings),
+                selected = currentContentType == MainContentType.SETTINGS,
+                onClick = { onContentTypeChange(MainContentType.SETTINGS) }
+            )
+            for (item in settingsPluginItems) {
+                PluginSidebarDrawerItem(item = item)
+            }
+
+            // ============ 关于分组 ============
+            BaseDrawerItem(
+                label = stringResource(R.string.about),
+                icon = Icons.Filled.Info,
+                iconContentDescription = stringResource(R.string.about),
+                selected = currentContentType == MainContentType.ABOUT,
+                onClick = { onContentTypeChange(MainContentType.ABOUT) }
+            )
+            for (item in aboutPluginItems) {
+                PluginSidebarDrawerItem(item = item)
+            }
+
+            // ============ 插件管理分组 ============
+            BaseDrawerItem(
+                label = stringResource(R.string.drawer_plugin_management),
+                icon = Icons.Filled.Extension,
+                iconContentDescription = stringResource(R.string.drawer_plugin_management),
+                selected = currentContentType == MainContentType.PLUGINS,
+                onClick = { onContentTypeChange(MainContentType.PLUGINS) }
+            )
+            for (item in pluginsPluginItems) {
+                PluginSidebarDrawerItem(item = item)
+            }
+
+            // ============ 插件自定义分组 ============
+            if (customPluginItems.isNotEmpty()) {
+                if (pluginItems.any { it.group != PluginNavigation.TYPE_CUSTOM }) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    )
+                }
+                for (item in customPluginItems) {
+                    PluginSidebarDrawerItem(item = item)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 24.dp),
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+        )
+        Column(
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.copyright, copyrightYear),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = stringResource(R.string.version, appVersionName),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+    }
+}
+
+/**
+ * 渲染一个基础的（宿主内置）侧滑栏菜单项
+ *
+ * @param label 显示文本
+ * @param icon 图标
+ * @param iconContentDescription 图标的无障碍描述
+ * @param selected 是否处于选中态
+ * @param onClick 点击回调
+ */
+@Composable
+private fun BaseDrawerItem(
+    label: String,
+    icon: ImageVector,
+    iconContentDescription: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    NavigationDrawerItem(
+        label = {
+            Text(label, fontWeight = FontWeight.Medium)
+        },
+        selected = selected,
+        onClick = onClick,
+        icon = {
+            Icon(
+                imageVector = icon,
+                contentDescription = iconContentDescription,
+                tint = if (selected)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        colors = NavigationDrawerItemDefaults.colors(
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            unselectedContainerColor = Color.Transparent,
+            selectedTextColor = MaterialTheme.colorScheme.primary,
+            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            selectedIconColor = MaterialTheme.colorScheme.primary,
+            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.padding(vertical = 4.dp)
+    )
+}
+
+/**
+ * 渲染一个插件注册的侧滑栏菜单项
+ *
+ * 根据 item.iconName 查找对应的 Material 图标；
+ * 调用 item.onClick 触发插件回调。
+ *
+ * @param item 由 PluginNavigation.addSidebarItem 注册的侧滑栏项
+ */
+@Composable
+private fun PluginSidebarDrawerItem(item: SidebarItem) {
+    val icon = getSidebarIconByName(item.iconName)
+    NavigationDrawerItem(
+        label = {
+            Text(item.label, fontWeight = FontWeight.Medium)
+        },
+        selected = false,
+        onClick = {
+            try {
+                item.onClick.run()
+            } catch (e: Exception) {
+                android.util.Log.e("AppDrawerContent", "插件侧滑栏点击回调执行失败: ${item.key}", e)
+            }
+        },
+        icon = {
+            Icon(
+                imageVector = icon,
+                contentDescription = item.label,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        colors = NavigationDrawerItemDefaults.colors(
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            unselectedContainerColor = Color.Transparent,
+            selectedTextColor = MaterialTheme.colorScheme.primary,
+            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            selectedIconColor = MaterialTheme.colorScheme.primary,
+            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.padding(vertical = 4.dp)
+    )
+}
+
+/**
+ * 将插件侧滑栏 iconName 映射到 Material 图标。
+ * 与 FileTree 中的 getIconByName 保持一致的命名风格，便于插件复用。
+ *
+ * @param iconName 图标名称（不区分大小写），若为 null 或无法识别，返回默认描述符图标
+ * @return 对应的 ImageVector
+ */
+private fun getSidebarIconByName(iconName: String?): ImageVector {
+    if (iconName.isNullOrBlank()) {
+        return Icons.Default.Extension
+    }
+    return when (iconName.lowercase(Locale.getDefault())) {
+        "folder" -> Icons.Default.Folder
+        "file" -> Icons.Default.Description
+        "code" -> Icons.Default.Code
+        "delete" -> Icons.Default.Delete
+        "copy" -> Icons.Default.ContentCopy
+        "rename" -> Icons.Default.DriveFileRenameOutline
+        "new" -> Icons.Default.CreateNewFolder
+        "settings" -> Icons.Default.Settings
+        "info" -> Icons.Default.Info
+        "edit" -> Icons.Default.Edit
+        "share" -> Icons.Default.Share
+        "download" -> Icons.Default.Download
+        "upload" -> Icons.Default.Upload
+        "star" -> Icons.Default.Star
+        "favorite" -> Icons.Default.Favorite
+        "bookmark" -> Icons.Default.Bookmark
+        "home" -> Icons.Default.Home
+        "search" -> Icons.Default.Search
+        "filter" -> Icons.Default.FilterList
+        "sort" -> Icons.AutoMirrored.Filled.Sort
+        "refresh" -> Icons.Default.Refresh
+        "export" -> Icons.Default.Share
+        "import" -> Icons.Default.Download
+        "send" -> Icons.Default.Send
+        "open" -> Icons.Default.OpenInNew
+        "close" -> Icons.Default.Close
+        "check" -> Icons.Default.Check
+        "alert", "warning" -> Icons.Default.Warning
+        "error" -> Icons.Default.Error
+        "success" -> Icons.Default.CheckCircle
+        "play" -> Icons.Default.PlayArrow
+        "pause" -> Icons.Default.Pause
+        "stop" -> Icons.Default.Stop
+        "plugin", "extension" -> Icons.Default.Extension
+        "menu" -> Icons.Default.Menu
+        "build" -> Icons.Default.Build
+        "javascript", "js" -> Icons.Default.Code
+        "html" -> Icons.Default.Code
+        "css" -> Icons.Default.Code
+        "lua" -> Icons.Default.Code
+        "json" -> Icons.Default.Code
+        "android" -> Icons.Default.PhoneAndroid
+        "web" -> Icons.Default.Public
+        "lock" -> Icons.Default.Lock
+        "unlock" -> Icons.Default.LockOpen
+        "database", "db" -> Icons.Default.Storage
+        "mail", "email" -> Icons.Default.Email
+        "person", "user" -> Icons.Default.Person
+        "group", "team" -> Icons.Default.Group
+        "notification" -> Icons.Default.Notifications
+        "time", "clock" -> Icons.Default.Schedule
+        "calendar" -> Icons.Default.CalendarToday
+        "music", "audio" -> Icons.Default.MusicNote
+        "image", "photo" -> Icons.Default.Image
+        "video" -> Icons.Default.VideoFile
+        "book" -> Icons.Default.MenuBook
+        "help" -> Icons.Default.Help
+        "about" -> Icons.Default.Info
+        else -> Icons.Default.Extension
     }
 }
 

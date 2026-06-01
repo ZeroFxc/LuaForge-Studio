@@ -90,7 +90,7 @@ checks.scaleType = {
 
 function addDir(out, dir, f)
   local ls = f.listFiles()
-  for n = 0, #ls - 1 do
+  for n = 1, #ls do
     local name = ls[n].getName()
     if ls[n].isDirectory() then
       addDir(out, dir .. name .. "/", ls[n])

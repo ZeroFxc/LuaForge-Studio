@@ -465,51 +465,51 @@ fun CodeEditScreen(
     // ========== 快捷功能列表（使用资源 ID） ==========
     val quickActions = remember {
         listOf(
-            QuickAction(R.string.code_editor_open, "打开", "打开") {
+            QuickAction(R.string.code_editor_open, "", "打开") {
                 viewModel.incrementQuickActionFrequency("打开")
                 scope.launch {
                     if (fileTreeDrawerState.isClosed) fileTreeDrawerState.open()
                 }
             },
-            QuickAction(R.string.save, "保存", "保存") {
+            QuickAction(R.string.save, "", "保存") {
                 viewModel.incrementQuickActionFrequency("保存")
                 scope.launch { viewModel.saveAllModifiedFiles(toast) }
             },
-            QuickAction(R.string.code_editor_new, "新建", "新建") {
+            QuickAction(R.string.code_editor_new, "", "新建") {
                 viewModel.incrementQuickActionFrequency("新建")
                 newFileType = context.getString(R.string.code_editor_file)
                 newFileName = ""
                 showNewFileDialog = true
             },
-            QuickAction(R.string.code_editor_format, "格式化", "格式化") {
+            QuickAction(R.string.code_editor_format, "", "格式化") {
                 viewModel.incrementQuickActionFrequency("格式化")
                 viewModel.formatCode()
             },
-            QuickAction(R.string.code_editor_layout_helper, "布局助手", "布局助手") {
+            QuickAction(R.string.code_editor_layout_helper, "", "布局助手") {
                 viewModel.incrementQuickActionFrequency("布局助手")
                 onLaunchLayoutHelper()
             },
-            QuickAction(R.string.code_editor_project_property, "项目属性", "项目属性") {
+            QuickAction(R.string.code_editor_project_property, "", "项目属性") {
                 scope.launch {
                     viewModel.saveAllFilesSilently()
                     viewModel.incrementQuickActionFrequency("项目属性")
                     currentOverlay = OverlayScreen.ATTRIBUTE
                 }
             },
-            QuickAction(R.string.code_editor_build, "构建项目", "构建项目") {
+            QuickAction(R.string.code_editor_build, "", "构建项目") {
                 viewModel.incrementQuickActionFrequency("构建项目")
                 onBuildProjectAction()
             },
-            QuickAction(R.string.code_editor_analyse, "导入分析", "导入分析") {
+            QuickAction(R.string.code_editor_analyse, "", "导入分析") {
                 viewModel.incrementQuickActionFrequency("导入分析")
                 val codeContent = viewModel.activeFileState?.content ?: ""
                 currentOverlay = OverlayScreen.ANALYSE(codeContent, projectPath)
             },
-            QuickAction(R.string.code_editor_api_viewer, "API阅览器", "API阅览器") {
+            QuickAction(R.string.code_editor_api_viewer, "", "API阅览器") {
                 viewModel.incrementQuickActionFrequency("API阅览器")
                 currentOverlay = OverlayScreen.JAVA_API()
             },
-            QuickAction(R.string.search, "搜索", "搜索") {
+            QuickAction(R.string.search, "", "搜索") {
                 viewModel.incrementQuickActionFrequency("搜索")
                 if (viewModel.openFiles.isNotEmpty()) {
                     isSearchVisible = !isSearchVisible
@@ -522,11 +522,11 @@ fun CodeEditScreen(
                     }
                 }
             },
-            QuickAction(R.string.code_editor_backup, "备份", "备份") {
+            QuickAction(R.string.code_editor_backup, "", "备份") {
                 viewModel.incrementQuickActionFrequency("备份")
                 onBackupProject()
             },
-            QuickAction(R.string.code_editor_palette, "调色板", "调色板") {
+            QuickAction(R.string.code_editor_palette, "", "调色板") {
                 viewModel.incrementQuickActionFrequency("调色板")
                 showColorPickerDialog = true
             }
@@ -1226,7 +1226,7 @@ fun FileTabIcon(
         when {
             iconResId != null -> Icon(
                 painter = painterResource(id = iconResId),
-                contentDescription = "${extension.uppercase()}文件",
+                contentDescription = stringResource(R.string.code_editor_file_icon_desc, extension.uppercase()),
                 modifier = Modifier.fillMaxSize(),
                 tint = currentColor
             )
@@ -1248,7 +1248,7 @@ fun FileTabIcon(
                 }
                 Icon(
                     imageVector = iconVector,
-                    contentDescription = "文件",
+                    contentDescription = stringResource(R.string.code_editor_file),
                     modifier = Modifier.fillMaxSize(),
                     tint = currentColor
                 )
@@ -1296,12 +1296,12 @@ fun DownloadProgressDialog(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = currentFile.ifEmpty { "正在准备..." },
+                        text = currentFile.ifEmpty { stringResource(R.string.code_editor_preparing) },
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "正在分析项目依赖，请稍候...",
+                        text = stringResource(R.string.code_editor_analyzing_deps),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1314,7 +1314,7 @@ fun DownloadProgressDialog(
                     Spacer(modifier = Modifier.height(12.dp))
                     // 文件信息
                     Text(
-                        text = "正在下载: ${currentFile.takeLast(30)}", // 截断长文件名
+                        text = stringResource(R.string.download_progress_file, currentFile.takeLast(30)),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1
                     )

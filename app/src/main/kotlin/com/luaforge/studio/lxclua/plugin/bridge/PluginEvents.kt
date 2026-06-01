@@ -52,4 +52,13 @@ class PluginEvents(private val pluginId: String) {
     val ON_APP_RESUME = "onAppResume"
     val ON_APP_PAUSE = "onAppPause"
     val ON_APP_STOP = "onAppStop"
+    
+    // 主页项目列表事件
+    val ON_PROJECT_LONG_PRESS = "onProjectLongPress"
+    val ON_PROJECT_CLICK = "onProjectClick"
+    val ON_PROJECT_SWIPE_LEFT = "onProjectSwipeLeft"
+    val ON_PROJECT_SWIPE_RIGHT = "onProjectSwipeRight"
+    
+    // UI 交互事件
+    val ON_BACK_PRESSED = "onBackPressed"
 }

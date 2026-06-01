@@ -1,0 +1,16 @@
+{
+  "id": "com.example.settings_test",
+  "name": "Settings & Detail Test",
+  "version": "1.0.0",
+  "description": "测试插件设置页面扩展和插件详情展开区扩展 API",
+  "author": "Nirithy",
+  "type": "lua",
+  "pluginType": "normal",
+  "main": "main.lua",
+  "apiVersion": 1,
+  "category": "test",
+  "homepage": null,
+  "icon": null,
+  "dependencies": [],
+  "extendedBy": []
+}

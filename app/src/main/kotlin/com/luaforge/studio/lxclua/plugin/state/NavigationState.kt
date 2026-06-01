@@ -1,6 +1,7 @@
 package com.luaforge.studio.lxclua.plugin.state
 
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -21,14 +22,14 @@ data class SidebarItem(
  */
 object NavigationState {
     
-    // 插件注册的侧滑栏菜单项
-    private val pluginSidebarItems = mutableStateListOf<SidebarItem>()
+    // 插件注册的侧滑栏菜单项（Compose 响应式列表，UI 直接读取以触发重组）
+    val pluginSidebarItems = mutableStateListOf<SidebarItem>()
     
     // 侧滑栏状态回调
     private val sidebarStateListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
     
-    // 当前侧滑栏状态
-    private var isSidebarOpenState = false
+    // 当前侧滑栏状态（Compose 响应式，供 UI 直接观察）
+    val sidebarOpen = mutableStateOf(false)
     
     // 当前导航页面
     private var currentPage = "editor"
@@ -87,7 +88,7 @@ object NavigationState {
      * 打开侧滑栏
      */
     fun openSidebar() {
-        isSidebarOpenState = true
+        sidebarOpen.value = true
         notifySidebarStateChanged(true)
     }
     
@@ -95,7 +96,7 @@ object NavigationState {
      * 关闭侧滑栏
      */
     fun closeSidebar() {
-        isSidebarOpenState = false
+        sidebarOpen.value = false
         notifySidebarStateChanged(false)
     }
     
@@ -103,7 +104,7 @@ object NavigationState {
      * 切换侧滑栏状态
      */
     fun toggleSidebar() {
-        if (isSidebarOpenState) {
+        if (sidebarOpen.value) {
             closeSidebar()
         } else {
             openSidebar()
@@ -114,7 +115,7 @@ object NavigationState {
      * 检查侧滑栏是否打开
      */
     fun isSidebarOpen(): Boolean {
-        return isSidebarOpenState
+        return sidebarOpen.value
     }
     
     /**

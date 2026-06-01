@@ -430,6 +430,9 @@
     <string name="select_copy_format">选择复制格式</string>
     <string name="downloading_dependencies">正在下载依赖</string>
     <string name="download_progress_file">正在下载: %s</string>
+    <string name="code_editor_analyzing_deps">正在分析项目依赖，请稍候...</string>
+    <string name="code_editor_preparing">正在准备...</string>
+    <string name="code_editor_file_icon_desc">%s 文件</string>
     <string name="download_progress_count_and_size">%d / %d · %s / %s</string>
 
     <string name="editor_back">返回</string>
@@ -609,4 +612,76 @@
     <string name="splash_extracting_lua">正在解压 Lua 模块…</string>
     <string name="splash_loading_done">加载完成</string>
     <string name="splash_loading_error">加载出错，将继续启动</string>
+
+    <!-- 插件管理界面 -->
+    <string name="plugin_no_plugins">未发现任何插件</string>
+    <string name="plugin_no_files">该目录下没有文件</string>
+    <string name="plugin_import_zip_hint">导入 .zip 插件包</string>
+    <string name="plugin_import_dir_hint">从目录导入插件</string>
+    <string name="plugin_refresh_from_dir">从目录刷新插件列表</string>
+    <string name="plugin_refresh_cd">刷新</string>
+    <string name="plugin_import_zip_button">导入ZIP</string>
+    <string name="plugin_import_dir_button">导入目录</string>
+    <string name="plugin_fab_import">导入插件</string>
+    <string name="plugin_dialog_delete_title">确认删除插件</string>
+    <string name="plugin_dialog_delete_message">确定要彻底删除插件 [%1$s] 吗？此操作无法撤销。</string>
+    <string name="plugin_cd_view_log">查看日志</string>
+    <string name="plugin_cd_delete">删除插件</string>
+    <string name="plugin_menu_edit">编辑信息</string>
+    <string name="plugin_menu_export_zip">导出为 ZIP</string>
+    <string name="plugin_menu_export_dir">导出为目录</string>
+    <string name="plugin_edit_title">编辑插件信息</string>
+    <string name="plugin_edit_name">名称</string>
+    <string name="plugin_edit_description">描述</string>
+    <string name="plugin_edit_author">作者</string>
+    <string name="plugin_edit_version">版本</string>
+    <string name="plugin_edit_category">分类</string>
+    <string name="plugin_edit_save">保存</string>
+    <string name="plugin_version_author">v%1$s · %2$s</string>
+    <string name="plugin_id_label">ID: %s</string>
+    <string name="plugin_install_success">插件 %1$s 安装成功！</string>
+    <string name="plugin_install_failed">安装失败: %1$s</string>
+    <string name="plugin_read_zip_failed">读取 ZIP 文件失败</string>
+    <string name="plugin_import_dir_success">插件 %1$s 导入成功！</string>
+    <string name="plugin_import_dir_failed">导入失败: %1$s</string>
+    <string name="plugin_read_dir_failed">读取目录失败</string>
+    <string name="plugin_export_zip_success">导出 ZIP 成功</string>
+    <string name="plugin_export_zip_failed">导出 ZIP 失败</string>
+    <string name="plugin_export_dir_success">导出目录成功</string>
+    <string name="plugin_export_dir_failed">导出目录失败</string>
+    <string name="plugin_deleted">插件已删除</string>
+    <string name="plugin_info_updated">插件信息已更新</string>
+    <string name="plugin_update_failed">更新失败</string>
+
+    <!-- 关于页面插件扩展 -->
+    <string name="about_plugin_extensions">插件扩展</string>
+
+    <!-- 插件日志查看界面 -->
+    <string name="plugin_log_cd_back">返回</string>
+    <string name="plugin_log_subtitle">日志 · %1$s</string>
+    <string name="plugin_log_cd_refresh">刷新</string>
+    <string name="plugin_log_cd_clear">清空日志</string>
+    <string name="plugin_log_path">LXC-LUA/plugins/%1$s/logs/</string>
+    <string name="plugin_log_empty_title">暂无日志</string>
+    <string name="plugin_log_empty_hint">插件通过 plugin.sys.log() 写入日志后会显示在这里</string>
+    <string name="plugin_log_files_section">日志文件</string>
+    <string name="plugin_log_select_hint">请选择上方的日志文件</string>
+    <string name="plugin_log_empty_file">（空文件）</string>
+    <string name="plugin_log_clear_dialog_title">清空日志</string>
+    <string name="plugin_log_clear_dialog_message">确定要删除该插件的所有日志文件吗？此操作不可撤销。</string>
+    <string name="plugin_log_clear_confirm">清空</string>
+    <string name="plugin_installing_zip">正在从 ZIP 安装...</string>
+    <string name="plugin_installing_dir">正在从目录导入...</string>
+    <string name="plugin_installing_wait">正在安装插件，请稍候...</string>
+    <string name="plugin_expand_collapse">收起</string>
+    <string name="plugin_expand_detail">展开详情</string>
+    <string name="plugin_expand_cd">展开</string>
+    <string name="plugin_category_core">核心</string>
+    <string name="plugin_category_normal">普通</string>
+    <string name="plugin_category_dependent">附属</string>
+    <string name="plugin_category_extension">扩展</string>
+    <string name="plugin_dependencies_label">依赖:</string>
+    <string name="plugin_extended_by_label">被扩展:</string>
+    <string name="plugin_detail_extensions">插件设置</string>
+    <string name="drawer_plugin_management">插件管理</string>
 </resources>

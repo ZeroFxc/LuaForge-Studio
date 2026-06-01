@@ -23,13 +23,14 @@ import java.io.File
  * - plugin.http: 网络请求
  * - plugin.manager: 插件管理
  * - plugin.nav: 导航与侧滑栏
+ * - plugin.about: 关于页面扩展（添加 section、链接、回调、信息项）
  */
 class PluginBridge(private val context: Context, private val pluginId: String) {
     
     // ============ 子模块入口 ============
     
     /** 系统操作 API */
-    val sys = PluginSys(context)
+    val sys = PluginSys(context, pluginId)
     
     /** 编辑器操作 API */
     val editor = PluginEditor()
@@ -66,6 +67,18 @@ class PluginBridge(private val context: Context, private val pluginId: String) {
     
     /** 导航与侧滑栏 API */
     val nav = PluginNavigation(pluginId)
+    
+    /** 关于页面扩展 API */
+    val about = PluginAboutBridge(pluginId)
+    
+    /** 主页项目列表操作 API */
+    val mainpage = PluginMainPage(pluginId)
+    
+    /** 设置页面扩展 API */
+    val settings = PluginSettingsBridge(pluginId)
+    
+    /** 插件详情展开区扩展 API */
+    val detail = PluginDetailBridge(pluginId)
     
     // ============ 版本信息 ============
     

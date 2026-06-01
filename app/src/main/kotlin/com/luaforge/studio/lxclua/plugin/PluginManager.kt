@@ -3,6 +3,7 @@ package com.luaforge.studio.lxclua.plugin
 import android.content.Context
 import android.os.Environment
 import com.google.gson.Gson
+import com.luaforge.studio.lxclua.ProjectItem
 import com.luaforge.studio.lxclua.plugin.api.IPlugin
 import com.luaforge.studio.lxclua.plugin.data.PluginManifest
 import com.luaforge.studio.lxclua.plugin.loaders.DexPluginLoader
@@ -14,8 +15,10 @@ import com.luaforge.studio.lxclua.ui.editor.QuickAction
 import com.luaforge.studio.lxclua.ui.editor.viewmodel.EditorViewModel
 import com.luajava.LuaState
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import java.io.File
+import java.util.UUID
 
 /**
  * 已加载插件包装类
@@ -94,9 +97,74 @@ object PluginManager {
             val onConfirm: (BooleanArray) -> Unit,
             val onDismiss: () -> Unit
         ) : DialogState()
+
+        data class FileList(
+            val title: String,
+            val directoryPath: String,
+            val filter: String?,
+            val onSelect: (String) -> Unit,
+            val onDismiss: () -> Unit
+        ) : DialogState()
+
+        data class ImageDisplay(
+            val title: String,
+            val imagePath: String,
+            val onDismiss: () -> Unit
+        ) : DialogState()
+
+        data class TextDisplay(
+            val title: String,
+            val text: String,
+            val onDismiss: () -> Unit
+        ) : DialogState()
+
+        data class Checkbox(
+            val title: String,
+            val message: String,
+            val checked: Boolean,
+            val onConfirm: (Boolean) -> Unit,
+            val onDismiss: () -> Unit
+        ) : DialogState()
     }
     
     val currentDialog = mutableStateOf<DialogState?>(null)
+    
+    // 主页项目多选模式状态
+    val isMultiSelectMode = mutableStateOf(false)
+    val multiSelectedProjectIds = mutableStateListOf<String>()
+    
+    // 项目徽章状态: projectId -> BadgeInfo
+    data class BadgeInfo(val text: String, val color: Long)
+    val projectBadges = mutableStateMapOf<String, BadgeInfo>()
+    
+    // 插件注册的项目卡片菜单项
+    data class ProjectCardMenuItem(
+        val key: String,
+        val label: String,
+        val onClick: (String, String, String) -> Unit  // projectId, projectName, projectPath
+    )
+    val projectCardMenuItems = mutableStateListOf<ProjectCardMenuItem>()
+
+    // 编辑器底部面板扩展
+    data class BottomPanelElement(
+        val type: String,           // "text", "button", "spacer", "section"
+        val id: String? = null,     // 用于按钮点击事件
+        val value: String? = null,  // 文本内容或按钮标签
+        val height: Float = 0f      // 用于 spacer
+    )
+
+    data class BottomPanelItem(
+        val pluginId: String,
+        val key: String,
+        val title: String,
+        val elements: List<BottomPanelElement>,
+        val onEvent: Runnable?
+    )
+    val bottomPanelItems = mutableStateListOf<BottomPanelItem>()
+    val activeBottomPanelKey = mutableStateOf<String?>(null)
+    
+    // 当前主页项目列表数据（供插件读取）
+    val currentProjectItems = mutableStateListOf<ProjectItem>()
     
     /**
      * 获取插件存放根目录
@@ -112,6 +180,17 @@ object PluginManager {
         } else {
             File(context.filesDir, "plugins").apply { mkdirs() }
         }
+    }
+    
+    /**
+     * 获取指定插件的目录 File 对象
+     * @param context 任意 Context
+     * @param pluginId 插件 ID
+     * @return 插件目录 File；插件未加载或不存在时返回 null
+     */
+    fun getPluginDirectory(context: Context, pluginId: String): File? {
+        val plugin = loadedPlugins.find { it.manifest.id == pluginId } ?: return null
+        return plugin.directory
     }
     
     private fun getPrefs(context: Context) = 
@@ -327,6 +406,24 @@ object PluginManager {
         
         // 移除文件树菜单项
         UIState.removeFileTreeMenuItems(pluginId)
+        
+        // 移除侧滑栏菜单项
+        com.luaforge.studio.lxclua.plugin.state.NavigationState.clearPluginSidebarItems(pluginId)
+        
+        // 移除关于页面 section / item
+        com.luaforge.studio.lxclua.plugin.state.AboutState.clearPluginItems(pluginId)
+        
+        // 移除设置页面扩展
+        com.luaforge.studio.lxclua.plugin.state.PluginSettingsState.clearPluginItems(pluginId)
+        
+        // 移除插件详情展开区扩展
+        com.luaforge.studio.lxclua.plugin.state.PluginDetailState.clearPluginItems(pluginId)
+
+        // 移除底部面板扩展
+        bottomPanelItems.removeAll { it.pluginId == pluginId }
+        if (bottomPanelItems.none { it.key == activeBottomPanelKey.value }) {
+            activeBottomPanelKey.value = bottomPanelItems.firstOrNull()?.key
+        }
     }
     
     /**
@@ -449,10 +546,14 @@ object PluginManager {
      */
     fun installPluginFromZip(context: Context, zipFile: File): Result<PluginManifest> {
         try {
-            val tempDir = File(context.cacheDir, "temp_plugin_extract_${System.currentTimeMillis()}")
+            val tempDir = File(context.cacheDir, "temp_plugin_extract_${UUID.randomUUID()}")
             tempDir.mkdirs()
             
-            com.luaforge.studio.lxclua.utils.FileUtil.extractZip(zipFile, tempDir)
+            val extractOk = com.luaforge.studio.lxclua.utils.FileUtil.extractZip(zipFile, tempDir)
+            if (!extractOk) {
+                tempDir.deleteRecursively()
+                return Result.failure(Exception("ZIP 解压失败，文件可能已损坏"))
+            }
             
             var manifestFile = File(tempDir, "manifest.json")
             if (!manifestFile.exists()) {
@@ -486,6 +587,79 @@ object PluginManager {
             return Result.success(manifest)
         } catch (e: Exception) {
             return Result.failure(e)
+        }
+    }
+    
+    /**
+     * 从目录导入插件（复制到 plugins 目录）
+     */
+    fun installPluginFromDirectory(context: Context, sourceDir: File): Result<PluginManifest> {
+        try {
+            val manifestFile = File(sourceDir, "manifest.json")
+            if (!manifestFile.exists()) {
+                return Result.failure(Exception("目录中未找到 manifest.json"))
+            }
+            
+            val content = manifestFile.readText()
+            val manifest = Gson().fromJson(content, PluginManifest::class.java)
+            
+            val pluginsDir = getPluginsDir(context)
+            val destDir = File(pluginsDir, manifest.id)
+            
+            if (destDir.exists()) {
+                togglePlugin(context, manifest.id, false)
+                getPrefs(context).edit().remove(PREF_ENABLED_PREFIX + manifest.id).apply()
+            }
+            
+            destDir.deleteRecursively()
+            sourceDir.copyRecursively(destDir, overwrite = true)
+            
+            scanPlugins(context)
+            
+            return Result.success(manifest)
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+    }
+    
+    /**
+     * 导出插件为 ZIP 文件
+     */
+    fun exportPluginToZip(context: Context, pluginId: String, destZipFile: File): Boolean {
+        val plugin = loadedPlugins.find { it.manifest.id == pluginId } ?: return false
+        return com.luaforge.studio.lxclua.utils.FileUtil.createZip(plugin.directory, destZipFile) { file ->
+            file.isDirectory && file.name == "logs"
+        }
+    }
+    
+    /**
+     * 导出插件到指定目录
+     */
+    fun exportPluginToDirectory(context: Context, pluginId: String, destDir: File): Boolean {
+        val plugin = loadedPlugins.find { it.manifest.id == pluginId } ?: return false
+        return try {
+            val targetDir = File(destDir, plugin.manifest.id)
+            targetDir.deleteRecursively()
+            plugin.directory.copyRecursively(targetDir, overwrite = true)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * 更新插件 manifest.json
+     */
+    fun updatePluginManifest(context: Context, pluginId: String, newManifest: PluginManifest): Boolean {
+        val plugin = loadedPlugins.find { it.manifest.id == pluginId } ?: return false
+        return try {
+            val manifestFile = File(plugin.directory, "manifest.json")
+            val gson = com.google.gson.GsonBuilder().setPrettyPrinting().create()
+            manifestFile.writeText(gson.toJson(newManifest))
+            scanPlugins(context)
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 }

@@ -2,7 +2,10 @@ package com.luaforge.studio.lxclua.utils
 
 import android.content.Context
 import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 
 object FileUtil {
 
@@ -159,6 +162,40 @@ object FileUtil {
                                 input.copyTo(output)
                             }
                         }
+                    }
+                }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+    
+    /**
+     * 将目录打包为 ZIP 文件
+     * @param sourceDir 源目录
+     * @param destZipFile 目标 ZIP 文件
+     * @param excludeFilter 排除过滤器，返回 true 表示跳过该文件/目录。默认为空（不排除任何文件）。
+     *                      对于目录，会跳过该目录及其所有子内容。
+     * @return true 表示成功
+     */
+    fun createZip(sourceDir: File, destZipFile: File, excludeFilter: (File) -> Boolean = { false }): Boolean {
+        return try {
+            ZipOutputStream(FileOutputStream(destZipFile)).use { zos ->
+                sourceDir.walkTopDown().onEnter { dir ->
+                    dir == sourceDir || !excludeFilter(dir)
+                }.forEach { file ->
+                    if (file == sourceDir) return@forEach
+                    val relativePath = file.relativeTo(sourceDir).path.replace("\\", "/")
+                    if (file.isDirectory) {
+                        zos.putNextEntry(ZipEntry("$relativePath/"))
+                        zos.closeEntry()
+                    } else {
+                        if (excludeFilter(file)) return@forEach
+                        zos.putNextEntry(ZipEntry(relativePath))
+                        file.inputStream().use { it.copyTo(zos) }
+                        zos.closeEntry()
                     }
                 }
             }

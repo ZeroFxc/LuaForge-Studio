@@ -1,0 +1,19 @@
+{
+  "id": "com.example.hello_plugin",
+  "name": "Hello Plugin",
+  "version": "1.0.0",
+  "description": "一个演示 LXC-LUA 插件 API 的入门示例插件",
+  "author": "Nirithy",
+  "type": "lua",
+  "pluginType": "normal",
+  "main": "main.lua",
+  "apiVersion": 1,
+  "category": "demo",
+  "homepage": null,
+  "icon": null,
+  "dependencies": [],
+  "extendedBy": [
+    "com.example.multi_select",
+    "com.example.settings_test"
+  ]
+}

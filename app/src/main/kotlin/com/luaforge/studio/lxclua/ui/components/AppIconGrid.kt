@@ -45,7 +45,7 @@ fun AppIconGrid(
         ) {
             AppIconOption(
                 modifier = Modifier.size(60.dp),
-                iconResId = R.drawable.ic_launcher_playstore,
+                iconResId = R.mipmap.ic_launcher,
                 isSelected = selectedIcon == IconManager.AppIcon.PLAY_STORE,
                 onClick = { onIconSelected(IconManager.AppIcon.PLAY_STORE) }
             )

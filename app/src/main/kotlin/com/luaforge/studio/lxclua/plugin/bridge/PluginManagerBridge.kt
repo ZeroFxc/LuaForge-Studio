@@ -14,9 +14,12 @@ class PluginManagerBridge {
     
     /**
      * 获取所有已安装插件的 ID 列表
+     *
+     * 返回 Array 而非 List：LuaJava 在转换 Kotlin List 时可能丢失长度/索引，
+     * 改用 Java 数组后 Lua 端可直接用 ipairs 安全遍历。
      */
-    fun getPluginIds(): List<String> {
-        return PluginManager.loadedPlugins.map { it.manifest.id }
+    fun getPluginIds(): Array<String> {
+        return PluginManager.loadedPlugins.map { it.manifest.id }.toTypedArray()
     }
     
     /**
@@ -77,16 +80,20 @@ class PluginManagerBridge {
     
     /**
      * 获取插件依赖的插件 ID 列表
+     *
+     * 返回 Array 而非 List，规避 LuaJava 转换问题。
      */
-    fun getPluginDependencies(pluginId: String): List<String> {
+    fun getPluginDependencies(pluginId: String): Array<String> {
         return PluginManager.loadedPlugins.find { it.manifest.id == pluginId }
-            ?.manifest?.dependencies?.map { it.pluginId } ?: emptyList()
+            ?.manifest?.dependencies?.map { it.pluginId }?.toTypedArray() ?: emptyArray()
     }
     
     /**
      * 获取插件依赖的详细信息列表
+     *
+     * 返回 Array 而非 List，规避 LuaJava 转换问题。
      */
-    fun getPluginDependenciesInfo(pluginId: String): List<DependencyInfo> {
+    fun getPluginDependenciesInfo(pluginId: String): Array<DependencyInfo> {
         return PluginManager.loadedPlugins.find { it.manifest.id == pluginId }
             ?.manifest?.dependencies?.map { dep ->
                 DependencyInfo(
@@ -94,18 +101,21 @@ class PluginManagerBridge {
                     minVersion = dep.minVersion,
                     required = dep.required
                 )
-            } ?: emptyList()
+            }?.toTypedArray() ?: emptyArray()
     }
     
     /**
      * 获取依赖指定插件的所有插件 ID 列表
+     *
+     * 返回 Array 而非 List，规避 LuaJava 转换问题。
      */
-    fun getDependentPluginIds(pluginId: String): List<String> {
+    fun getDependentPluginIds(pluginId: String): Array<String> {
         return PluginManager.loadedPlugins
             .filter { plugin ->
                 plugin.manifest.dependencies.any { it.pluginId == pluginId }
             }
             .map { it.manifest.id }
+            .toTypedArray()
     }
     
     /**

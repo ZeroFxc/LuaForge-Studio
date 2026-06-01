@@ -34,9 +34,46 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -60,6 +97,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -76,6 +114,9 @@ import androidx.core.content.edit
 import androidx.core.net.toUri
 import com.luaforge.studio.lxclua.BuildConfig
 import com.luaforge.studio.lxclua.R
+import com.luaforge.studio.lxclua.plugin.state.AboutItem
+import com.luaforge.studio.lxclua.plugin.state.AboutSection
+import com.luaforge.studio.lxclua.plugin.state.AboutState
 import com.luaforge.studio.lxclua.utils.AppInfoUtil
 import com.luaforge.studio.lxclua.utils.JsonUtil
 import com.luaforge.studio.lxclua.utils.LogCatcher
@@ -628,6 +669,42 @@ fun AboutScreen(onBack: () -> Unit) {
                                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                                     )
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            // 读取插件注册的 sections / items，使 Compose 跟踪其变化
+            val pluginSections = AboutState.pluginSections
+            val pluginItems = AboutState.pluginItems
+
+            if (pluginSections.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                SectionTitle(stringResource(R.string.about_plugin_extensions))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val sortedSections = pluginSections.sortedWith(compareBy({ it.priority }, { it.key }))
+                    for (section in sortedSections) {
+                        val sectionItems = pluginItems.filter { it.sectionKey == section.key }
+                        if (sectionItems.isNotEmpty()) {
+                            // section 标题
+                            Text(
+                                text = section.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
+                            for (item in sectionItems) {
+                                PluginAboutItemCard(item = item)
                             }
                         }
                     }
@@ -1276,5 +1353,156 @@ fun DeveloperChip(
                 )
             }
         }
+    }
+}
+
+/**
+ * 渲染一个插件注册的关于页面项
+ *
+ * 根据 actionType 处理不同的交互：
+ *  - "url"      点击调用系统浏览器打开 url
+ *  - "callback" 点击调用 onClick 回调
+ *  - "info"     不可点击
+ */
+@Composable
+private fun PluginAboutItemCard(item: AboutItem) {
+    val context = LocalContext.current
+    val icon = resolveAboutIconByName(item.iconName)
+    val iconBg = if (item.iconColorArgb == 0) Color(0xFF5B8DEF) else Color(item.iconColorArgb)
+
+    val onClickAction: (() -> Unit)? = when (item.actionType) {
+        AboutState.ACTION_URL -> {
+            val url = item.url
+            if (url.isNullOrBlank()) null else {
+                {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        LogCatcher.e("AboutScreen", "插件关于项打开链接失败: ${item.key}", e)
+                    }
+                }
+            }
+        }
+        AboutState.ACTION_CALLBACK -> item.onClick
+        else -> null
+    }
+
+    val cardModifier = Modifier.fillMaxWidth()
+    val cardContent: @Composable () -> Unit = {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = iconBg,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = item.title,
+                        modifier = Modifier.size(22.dp),
+                        tint = Color.White
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (item.subtitle.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = item.subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (onClickAction != null) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+
+    if (onClickAction != null) {
+        Surface(
+            onClick = onClickAction,
+            modifier = cardModifier,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = MaterialTheme.shapes.large
+        ) { cardContent() }
+    } else {
+        Surface(
+            modifier = cardModifier,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = MaterialTheme.shapes.large
+        ) { cardContent() }
+    }
+}
+
+/**
+ * 根据插件传入的 iconName 解析为 Material 图标
+ */
+private fun resolveAboutIconByName(iconName: String?): ImageVector {
+    if (iconName.isNullOrBlank()) return Icons.Default.Info
+    return when (iconName.lowercase(java.util.Locale.getDefault())) {
+        "folder" -> Icons.Default.Folder
+        "file" -> Icons.Default.Description
+        "code" -> Icons.Default.Code
+        "settings" -> Icons.Default.Settings
+        "info" -> Icons.Default.Info
+        "edit" -> Icons.Default.Edit
+        "share" -> Icons.Default.Share
+        "download" -> Icons.Default.Download
+        "upload" -> Icons.Default.Upload
+        "star" -> Icons.Default.Star
+        "favorite" -> Icons.Default.Favorite
+        "bookmark" -> Icons.Default.Bookmark
+        "home" -> Icons.Default.Home
+        "search" -> Icons.Default.Search
+        "web", "link" -> Icons.Default.Public
+        "mail", "email" -> Icons.Default.Email
+        "phone" -> Icons.Default.PhoneAndroid
+        "lock" -> Icons.Default.Lock
+        "database", "db" -> Icons.Default.Storage
+        "notification" -> Icons.Default.Notifications
+        "time", "clock" -> Icons.Default.Schedule
+        "calendar" -> Icons.Default.CalendarToday
+        "music", "audio" -> Icons.Default.MusicNote
+        "image", "photo" -> Icons.Default.Image
+        "video" -> Icons.Default.VideoFile
+        "book" -> Icons.Default.MenuBook
+        "person", "user" -> Icons.Default.Person
+        "group", "team" -> Icons.Default.Group
+        "plugin", "extension" -> Icons.Default.Extension
+        "build" -> Icons.Default.Build
+        "check" -> Icons.Default.Check
+        "warning" -> Icons.Default.Warning
+        "error" -> Icons.Default.Error
+        "success" -> Icons.Default.CheckCircle
+        "play" -> Icons.Default.PlayArrow
+        "help" -> Icons.Default.Help
+        "send" -> Icons.Default.Send
+        "open" -> Icons.AutoMirrored.Filled.OpenInNew
+        "menu" -> Icons.Default.Menu
+        "android" -> Icons.Default.PhoneAndroid
+        else -> Icons.Default.Extension
     }
 }

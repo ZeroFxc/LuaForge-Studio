@@ -3,6 +3,7 @@ package com.luaforge.studio.lxclua.plugin.api
 import com.luaforge.studio.lxclua.plugin.api.callbacks.OnInputCallback
 import com.luaforge.studio.lxclua.plugin.api.callbacks.OnSelectCallback
 import com.luaforge.studio.lxclua.plugin.api.callbacks.OnMultiSelectCallback
+import com.luaforge.studio.lxclua.plugin.PluginManager
 
 /**
  * 对话框相关 API
@@ -37,4 +38,39 @@ interface IPluginBridgeDialogs {
      * 显示进度对话框
      */
     fun showProgressDialog(title: String, message: String): ProgressDialogHandle
+
+    /**
+     * 显示文件列表对话框
+     */
+    fun showFileListDialog(title: String, directoryPath: String, filter: String?, onSelect: OnInputCallback)
+
+    /**
+     * 显示图片对话框
+     */
+    fun showImageDialog(title: String, imagePath: String)
+
+    /**
+     * 显示文本展示对话框
+     */
+    fun showTextDialog(title: String, text: String)
+
+    /**
+     * 显示复选框对话框
+     */
+    fun showCheckboxDialog(title: String, message: String, checked: Boolean, onConfirm: OnSelectCallback)
+
+    /**
+     * 添加编辑器底部面板项
+     */
+    fun addBottomPanelItem(pluginId: String, key: String, title: String, elements: List<PluginManager.BottomPanelElement>, onEvent: Runnable?)
+
+    /**
+     * 移除底部面板项
+     */
+    fun removeBottomPanelItem(key: String)
+
+    /**
+     * 清空插件的底部面板项
+     */
+    fun clearBottomPanelItems(pluginId: String)
 }

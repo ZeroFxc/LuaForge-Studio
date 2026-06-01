@@ -28,6 +28,15 @@ object PluginEvents {
     const val ON_APP_RESUME = "onAppResume"
     const val ON_APP_PAUSE = "onAppPause"
     const val ON_APP_STOP = "onAppStop"
+    
+    // 主页项目列表事件
+    const val ON_PROJECT_LONG_PRESS = "onProjectLongPress"
+    const val ON_PROJECT_CLICK = "onProjectClick"
+    const val ON_PROJECT_SWIPE_LEFT = "onProjectSwipeLeft"
+    const val ON_PROJECT_SWIPE_RIGHT = "onProjectSwipeRight"
+    
+    // UI 交互事件
+    const val ON_BACK_PRESSED = "onBackPressed"
 }
 
 /**

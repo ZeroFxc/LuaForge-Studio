@@ -430,6 +430,9 @@
     <string name="select_copy_format">Select Copy Format</string>
     <string name="downloading_dependencies">Downloading dependencies</string>
     <string name="download_progress_file">Downloading: %s</string>
+    <string name="code_editor_analyzing_deps">Analyzing project dependencies, please wait...</string>
+    <string name="code_editor_preparing">Preparing...</string>
+    <string name="code_editor_file_icon_desc">%s File</string>
     <string name="download_progress_count_and_size">%d / %d · %s / %s</string>
 
     <string name="editor_back">Back</string>
@@ -600,4 +603,75 @@
 
 <string name="code_editor_terminal">Terminal</string>
 
+    <!-- Plugin management screen -->
+    <string name="plugin_no_plugins">No plugins found</string>
+    <string name="plugin_no_files">No files in this directory</string>
+    <string name="plugin_import_zip_hint">Import a .zip plugin package</string>
+    <string name="plugin_import_dir_hint">Import a plugin from a directory</string>
+    <string name="plugin_refresh_from_dir">Refresh plugins from directory</string>
+    <string name="plugin_refresh_cd">Refresh</string>
+    <string name="plugin_import_zip_button">Import ZIP</string>
+    <string name="plugin_import_dir_button">Import directory</string>
+    <string name="plugin_fab_import">Import plugin</string>
+    <string name="plugin_dialog_delete_title">Confirm plugin deletion</string>
+    <string name="plugin_dialog_delete_message">Are you sure you want to permanently delete plugin [%1$s]? This cannot be undone.</string>
+    <string name="plugin_cd_view_log">View log</string>
+    <string name="plugin_cd_delete">Delete plugin</string>
+    <string name="plugin_menu_edit">Edit info</string>
+    <string name="plugin_menu_export_zip">Export as ZIP</string>
+    <string name="plugin_menu_export_dir">Export as directory</string>
+    <string name="plugin_edit_title">Edit plugin info</string>
+    <string name="plugin_edit_name">Name</string>
+    <string name="plugin_edit_description">Description</string>
+    <string name="plugin_edit_author">Author</string>
+    <string name="plugin_edit_version">Version</string>
+    <string name="plugin_edit_category">Category</string>
+    <string name="plugin_edit_save">Save</string>
+    <string name="plugin_version_author">v%1$s · %2$s</string>
+    <string name="plugin_id_label">ID: %s</string>
+    <string name="plugin_install_success">Plugin %1$s installed successfully!</string>
+    <string name="plugin_install_failed">Installation failed: %1$s</string>
+    <string name="plugin_read_zip_failed">Failed to read ZIP file</string>
+    <string name="plugin_import_dir_success">Plugin %1$s imported successfully!</string>
+    <string name="plugin_import_dir_failed">Import failed: %1$s</string>
+    <string name="plugin_read_dir_failed">Failed to read directory</string>
+    <string name="plugin_export_zip_success">ZIP exported</string>
+    <string name="plugin_export_zip_failed">ZIP export failed</string>
+    <string name="plugin_export_dir_success">Directory exported</string>
+    <string name="plugin_export_dir_failed">Directory export failed</string>
+    <string name="plugin_deleted">Plugin deleted</string>
+    <string name="plugin_info_updated">Plugin info updated</string>
+    <string name="plugin_update_failed">Update failed</string>
+
+    <!-- About screen plugin extensions -->
+    <string name="about_plugin_extensions">Plugin extensions</string>
+
+    <!-- Plugin log viewer screen -->
+    <string name="plugin_log_cd_back">Back</string>
+    <string name="plugin_log_subtitle">Log · %1$s</string>
+    <string name="plugin_log_cd_refresh">Refresh</string>
+    <string name="plugin_log_cd_clear">Clear logs</string>
+    <string name="plugin_log_path">LXC-LUA/plugins/%1$s/logs/</string>
+    <string name="plugin_log_empty_title">No logs yet</string>
+    <string name="plugin_log_empty_hint">Logs written via plugin.sys.log() will appear here</string>
+    <string name="plugin_log_files_section">Log files</string>
+    <string name="plugin_log_select_hint">Select a log file above</string>
+    <string name="plugin_log_empty_file">(empty file)</string>
+    <string name="plugin_log_clear_dialog_title">Clear logs</string>
+    <string name="plugin_log_clear_dialog_message">Are you sure you want to delete all log files for this plugin? This cannot be undone.</string>
+    <string name="plugin_log_clear_confirm">Clear</string>
+    <string name="plugin_installing_zip">Installing from ZIP...</string>
+    <string name="plugin_installing_dir">Importing from directory...</string>
+    <string name="plugin_installing_wait">Installing plugin, please wait...</string>
+    <string name="plugin_expand_collapse">Collapse</string>
+    <string name="plugin_expand_detail">Expand details</string>
+    <string name="plugin_expand_cd">Expand</string>
+    <string name="plugin_category_core">Core</string>
+    <string name="plugin_category_normal">Normal</string>
+    <string name="plugin_category_dependent">Dependent</string>
+    <string name="plugin_category_extension">Extension</string>
+    <string name="plugin_dependencies_label">Dependencies:</string>
+    <string name="plugin_extended_by_label">Extended by:</string>
+    <string name="plugin_detail_extensions">Plugin Settings</string>
+    <string name="drawer_plugin_management">Plugin Management</string>
 </resources>

@@ -36,11 +36,12 @@ class PluginReflect {
 
     /**
      * 创建类实例（带参数）
+     * args 为 nil 时将调用无参构造
      */
-    fun newInstance(className: String, args: Array<Any?>): Any? {
+    fun newInstance(className: String, args: Array<Any?>?): Any? {
         return try {
             val clazz = Class.forName(className)
-            val argArray = args
+            val argArray = args ?: emptyArray()
             val constructor = findBestConstructor(clazz, argArray)
             constructor?.apply { isAccessible = true }
             constructor?.newInstance(*convertArgs(constructor.parameterTypes, argArray))
