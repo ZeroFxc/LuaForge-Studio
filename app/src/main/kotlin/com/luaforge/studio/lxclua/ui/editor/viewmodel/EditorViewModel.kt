@@ -28,8 +28,15 @@ import com.luaforge.studio.lxclua.ui.editor.EditorColorSchemeManager
 import com.luaforge.studio.lxclua.ui.settings.FontManager
 import com.luaforge.studio.lxclua.ui.settings.SettingsManager
 import com.luaforge.studio.lxclua.utils.LogCatcher
+import com.luaforge.studio.lxclua.plugin.bridge.PluginSyntax
+import com.luaforge.studio.lxclua.plugin.bridge.PluginDecoration
+import com.luaforge.studio.lxclua.plugin.data.SyntaxLanguageRules
 import com.luaforge.studio.lxclua.utils.NonBlockingToastState
 import io.github.rosemoe.sora.event.SelectionChangeEvent
+import io.github.rosemoe.sora.event.ClickEvent
+import io.github.rosemoe.sora.event.DoubleClickEvent
+import io.github.rosemoe.sora.event.LongPressEvent
+import io.github.rosemoe.sora.event.SideIconClickEvent
 import io.github.rosemoe.sora.event.SubscriptionReceipt
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.EditorSearcher
@@ -650,7 +657,14 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
 
         val (cursorLine, cursorColumn) = getFileCursorPosition(filePath)
         val settings = SettingsManager.currentSettings
-        val luaLanguage = createLuaLanguageWithCompletion()
+        
+        // 检查是否有插件注册了该文件类型的语法高亮规则
+        val pluginSyntaxRules = PluginSyntax.getRulesByFileName(state.file.name)
+        if (pluginSyntaxRules != null) {
+            LogCatcher.i("EditorViewModel", "检测到插件语法规则: ${pluginSyntaxRules.languageId} (${pluginSyntaxRules.pluginId})")
+        }
+        
+        val luaLanguage = createLuaLanguageWithCompletion(pluginSyntaxRules)
 
         val editor = CodeEditor(context).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -679,6 +693,7 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
             isWordwrap = false
             nonPrintablePaintingFlags = if (settings.indentGuideEnabled) 81 else 0
             setEditorLanguage(luaLanguage)
+            PluginDecoration.applyToEditor(this, state.file.absolutePath)
             colorScheme = EditorColorScheme()
             EditorColorSchemeManager.applyNonComposableThemeColors(
                 scheme = colorScheme,
@@ -753,6 +768,13 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                         state.file.absolutePath,
                         content.toString()
                     )
+                    // 延迟到下一帧重应用装饰：clearAllPluginStyles 全量清除 sora-editor 已移位的样式，
+                    // applyToEditor 从注册表按固定行号重画，避免装饰跟随内容位移
+                    val fp = state.file.absolutePath
+                    this@apply.post {
+                        PluginDecoration.clearAllPluginStyles(this@apply)
+                        PluginDecoration.applyToEditor(this@apply, fp)
+                    }
                 }
 
                 override fun afterDelete(
@@ -769,6 +791,12 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                         state.file.absolutePath,
                         content.toString()
                     )
+                    // 延迟到下一帧重应用装饰，保持固定行号
+                    val fp = state.file.absolutePath
+                    this@apply.post {
+                        PluginDecoration.clearAllPluginStyles(this@apply)
+                        PluginDecoration.applyToEditor(this@apply, fp)
+                    }
                 }
             })
         }
@@ -777,21 +805,43 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
             updateCursorPosition(filePath, editor.cursor.leftLine, editor.cursor.leftColumn)
         }
         cursorListeners[filePath] = receipt
+
+        // 订阅装饰事件：点击/长按/双击装饰行时触发插件回调
+        editor.subscribeEvent(ClickEvent::class.java) { event, _ ->
+            if (PluginDecoration.hasDecorationsAtLine(filePath, event.line)) {
+                PluginDecoration.notifyDecorationClick()
+            }
+        }
+        editor.subscribeEvent(DoubleClickEvent::class.java) { event, _ ->
+            if (PluginDecoration.hasDecorationsAtLine(filePath, event.line)) {
+                PluginDecoration.notifyDecorationDoubleClick()
+            }
+        }
+        editor.subscribeEvent(LongPressEvent::class.java) { event, _ ->
+            if (PluginDecoration.hasDecorationsAtLine(filePath, event.line)) {
+                PluginDecoration.notifyDecorationLongClick()
+            }
+        }
+        editor.subscribeEvent(SideIconClickEvent::class.java) { _, _ ->
+            PluginDecoration.notifyGutterIconClick()
+        }
         editorInstances[filePath] = editor
         return editor
     }
 
-    private fun createLuaLanguageWithCompletion(): LuaLanguage {
+    private fun createLuaLanguageWithCompletion(pluginSyntaxRules: SyntaxLanguageRules? = null): LuaLanguage {
         val (classMap, baseMap, androidClasses) = CompletionDataManager.getCompletionData()
         return if (classMap != null && baseMap != null && androidClasses != null) {
             LuaLanguage(baseMap, classMap, androidClasses.toTypedArray()).apply {
                 setCompletionCaseSensitive(SettingsManager.currentSettings.completionCaseSensitive)
                 setHighlightHexColorsEnabled(SettingsManager.currentSettings.hexColorHighlightEnabled)
+                pluginSyntaxRules?.let { applyPluginSyntax(it) }
             }
         } else {
             LuaLanguage().apply {
                 setCompletionCaseSensitive(SettingsManager.currentSettings.completionCaseSensitive)
                 setHighlightHexColorsEnabled(SettingsManager.currentSettings.hexColorHighlightEnabled)
+                pluginSyntaxRules?.let { applyPluginSyntax(it) }
             }
         }
     }

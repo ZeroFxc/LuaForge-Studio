@@ -36,6 +36,7 @@ class LuaIncrementalAnalyzeManager :
 
     private var androidClasses: Set<String>? = null
     private var classNamesVersion = 0
+    private var pluginCustomKeywords: List<String> = emptyList()
     
     var highlightHexColorsEnabled: Boolean = false
 
@@ -74,6 +75,17 @@ class LuaIncrementalAnalyzeManager :
         this.androidClasses = androidClasses
         classNamesVersion++
         updateAllTokenizersClassNames()
+    }
+
+    /**
+     * 设置插件自定义关键词（用于插件动态语言语法高亮）
+     *
+     * @param keywords 自定义关键词列表
+     */
+    fun setPluginKeywords(keywords: List<String>) {
+        this.pluginCustomKeywords = keywords
+        val tokenizer = obtainTokenizer()
+        tokenizer.setCustomKeywords(keywords)
     }
 
     private fun updateAllTokenizersClassNames() {
@@ -570,7 +582,8 @@ Tokens.HEX_COLOR -> {
                 Tokens.ASYNC, Tokens.AWAIT, Tokens.STRUCT, Tokens.SUPERSTRUCT,
                 Tokens.CONCEPT, Tokens.NAMESPACE, Tokens.USING, Tokens.REQUIRES,
                 Tokens.BOOL, Tokens.CHAR, Tokens.DOUBLE, Tokens.FLOAT,
-                Tokens.TYPE_INT, Tokens.LONG, Tokens.VOID -> {
+                Tokens.TYPE_INT, Tokens.LONG, Tokens.VOID,
+                Tokens.PLUGIN_KEYWORD -> {
                     classNamePrevious = false
                     SpanFactory.obtain(
                         offset,

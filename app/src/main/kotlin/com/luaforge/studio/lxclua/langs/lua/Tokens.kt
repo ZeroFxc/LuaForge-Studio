@@ -216,4 +216,7 @@ enum class Tokens {
     MINUS_BAR,            // -|
     BAR_GT,               // |>
     LT_BAR,                // <|
+
+    // 插件注入
+    PLUGIN_KEYWORD,      // 插件注册的自定义关键词（运行时动态注入）
 }

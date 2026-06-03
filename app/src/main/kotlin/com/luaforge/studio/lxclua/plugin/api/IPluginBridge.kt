@@ -24,7 +24,8 @@ interface IPluginBridge :
     IPluginBridgeShortcut,
     IPluginBridgeCompletion,
     IPluginBridgeSymbolBar,
-    IPluginBridgeSyntax {
+    IPluginBridgeSyntax,
+    IPluginBridgeDecoration {
     
     // ==================== 基础功能 ====================
     

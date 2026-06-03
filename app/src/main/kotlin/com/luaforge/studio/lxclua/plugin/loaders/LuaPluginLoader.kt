@@ -26,6 +26,7 @@ import java.io.File
  * - plugin.http: 网络请求
  * - plugin.completion: 代码补全扩展（关键字/包函数/变量类型/自定义提供器）
  * - plugin.syntax: 语法高亮扩展（注册自定义语言的关键词/正则/注释/字符串/代码折叠规则）
+ * - plugin.decoration: 编辑器装饰（行背景色、gutter 图标、gutter 背景色）
  */
 object LuaPluginLoader {
     

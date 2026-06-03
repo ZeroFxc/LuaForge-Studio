@@ -593,12 +593,13 @@ fun PluginItemCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val typeText = plugin.manifest.type.uppercase()
-                        val badgeColor = when (plugin.manifest.type.lowercase()) {
+                        val type = plugin.manifest.type ?: "lua"
+                        val typeText = type.uppercase()
+                        val badgeColor = when (type.lowercase()) {
                             "lua" -> MaterialTheme.colorScheme.primaryContainer
                             else -> MaterialTheme.colorScheme.secondaryContainer
                         }
-                        val badgeTextColor = when (plugin.manifest.type.lowercase()) {
+                        val badgeTextColor = when (type.lowercase()) {
                             "lua" -> MaterialTheme.colorScheme.onPrimaryContainer
                             else -> MaterialTheme.colorScheme.onSecondaryContainer
                         }
@@ -616,21 +617,22 @@ fun PluginItemCard(
                             )
                         }
 
-                        val pluginTypeText = when (plugin.manifest.pluginType.lowercase()) {
+                        val pluginType = plugin.manifest.pluginType ?: "normal"
+                        val pluginTypeText = when (pluginType.lowercase()) {
                             "core" -> stringResource(R.string.plugin_category_core)
                             "normal" -> stringResource(R.string.plugin_category_normal)
                             "dependent" -> stringResource(R.string.plugin_category_dependent)
                             "extension" -> stringResource(R.string.plugin_category_extension)
-                            else -> plugin.manifest.pluginType
+                            else -> pluginType
                         }
-                        val pluginTypeBadgeColor = when (plugin.manifest.pluginType.lowercase()) {
+                        val pluginTypeBadgeColor = when (pluginType.lowercase()) {
                             "core" -> MaterialTheme.colorScheme.errorContainer
                             "normal" -> MaterialTheme.colorScheme.tertiaryContainer
                             "dependent" -> MaterialTheme.colorScheme.secondaryContainer
                             "extension" -> MaterialTheme.colorScheme.primaryContainer
                             else -> MaterialTheme.colorScheme.surfaceVariant
                         }
-                        val pluginTypeTextColor = when (plugin.manifest.pluginType.lowercase()) {
+                        val pluginTypeTextColor = when (pluginType.lowercase()) {
                             "core" -> MaterialTheme.colorScheme.onErrorContainer
                             "normal" -> MaterialTheme.colorScheme.onTertiaryContainer
                             "dependent" -> MaterialTheme.colorScheme.onSecondaryContainer
@@ -660,9 +662,10 @@ fun PluginItemCard(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    if (plugin.manifest.description.isNotEmpty()) {
+                    val description = plugin.manifest.description ?: ""
+                        if (description.isNotEmpty()) {
                         Text(
-                            text = plugin.manifest.description,
+                            text = description,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 3,
@@ -670,8 +673,10 @@ fun PluginItemCard(
                         )
                     }
 
-                    val hasDependencies = plugin.manifest.dependencies.isNotEmpty()
-                    val hasExtensions = plugin.manifest.extendedBy.isNotEmpty()
+                    val dependencies = plugin.manifest.dependencies ?: emptyList()
+                    val extensions = plugin.manifest.extendedBy ?: emptyList()
+                    val hasDependencies = dependencies.isNotEmpty()
+                    val hasExtensions = extensions.isNotEmpty()
 
                     if (hasDependencies || hasExtensions) {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -695,14 +700,14 @@ fun PluginItemCard(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
-                                plugin.manifest.dependencies.forEachIndexed { index, dep ->
+                                dependencies.forEachIndexed { index, dep ->
                                     val depPluginName = PluginManager.loadedPlugins
                                         .find { it.manifest.id == dep.pluginId }?.manifest?.name ?: dep.pluginId
                                     val isSatisfied = PluginManager.loadedPlugins.any {
                                         it.manifest.id == dep.pluginId && it.enabled
                                     }
                                     Text(
-                                        text = depPluginName + if (index < plugin.manifest.dependencies.size - 1) ", " else "",
+                                        text = depPluginName + if (index < dependencies.size - 1) ", " else "",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = if (isSatisfied)
                                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -733,12 +738,12 @@ fun PluginItemCard(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.secondary
                                 )
-                                plugin.manifest.extendedBy.forEachIndexed { index, extId ->
+                                extensions.forEachIndexed { index, extId ->
                                     val extPluginName = PluginManager.loadedPlugins
                                         .find { it.manifest.id == extId }?.manifest?.name ?: extId
                                     val isLoaded = PluginManager.loadedPlugins.any { it.manifest.id == extId }
                                     Text(
-                                        text = extPluginName + if (index < plugin.manifest.extendedBy.size - 1) ", " else "",
+                                        text = extPluginName + if (index < extensions.size - 1) ", " else "",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = if (isLoaded)
                                             MaterialTheme.colorScheme.onSurfaceVariant

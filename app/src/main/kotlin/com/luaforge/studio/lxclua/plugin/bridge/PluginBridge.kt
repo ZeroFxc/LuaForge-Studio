@@ -30,6 +30,7 @@ import java.io.File
  * - plugin.completion: 代码补全扩展（关键字/包函数/变量类型/自定义提供器）
  * - plugin.notification: 通知系统（IDE 内通知横幅、系统通知推送、通知分组和优先级）
  * - plugin.syntax: 语法高亮扩展（注册自定义语言的关键词/正则/注释/字符串/代码折叠规则）
+ * - plugin.decoration: 编辑器装饰（行背景色、gutter 区域背景色、gutter 图标）
  * - plugin.symbolBar: 符号栏操作（添加/移除符号、频率统计、面板展开收起、面板高度控制）
  */
 class PluginBridge(private val context: Context, private val pluginId: String) {
@@ -107,6 +108,9 @@ class PluginBridge(private val context: Context, private val pluginId: String) {
     
     /** 语法高亮扩展 API */
     val syntax = PluginSyntax(pluginId)
+    
+    /** 编辑器装饰 API */
+    val decoration = PluginDecoration(pluginId)
     
     // ============ 版本信息 ============
     

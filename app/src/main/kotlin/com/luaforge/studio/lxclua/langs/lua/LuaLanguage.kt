@@ -7,6 +7,7 @@ import com.luaforge.studio.lxclua.langs.lua.completion.MyIdentifierAutoComplete
 import com.luaforge.studio.lxclua.langs.lua.completion.MyPrefixChecker
 import com.luaforge.studio.lxclua.langs.lua.format.LuaFormatter
 import com.luaforge.studio.lxclua.plugin.bridge.PluginCompletion
+import com.luaforge.studio.lxclua.plugin.data.SyntaxLanguageRules
 import io.github.rosemoe.sora.lang.Language
 import io.github.rosemoe.sora.lang.QuickQuoteHandler
 import io.github.rosemoe.sora.lang.analysis.AnalyzeManager
@@ -380,6 +381,26 @@ class LuaLanguage : Language {
     manager.highlightHexColorsEnabled = enabled
     return this
 }
+
+    /**
+     * 应用插件注册的语法高亮规则
+     * 将自定义语言的关键词/注释/字符串/折叠规则注入到当前 LuaLanguage 中
+     *
+     * @param rules 插件注册的语法规则
+     */
+    fun applyPluginSyntax(rules: SyntaxLanguageRules): LuaLanguage {
+        // 应用自定义关键词到分词器
+        if (rules.keywords.isNotEmpty()) {
+            manager.setPluginKeywords(rules.keywords)
+        }
+        
+        // 应用自定义关键词到补全系统
+        for (keyword in rules.keywords) {
+            addCompletionKeyword(keyword)
+        }
+        
+        return this
+    }
 
     /**
      * 释放内存

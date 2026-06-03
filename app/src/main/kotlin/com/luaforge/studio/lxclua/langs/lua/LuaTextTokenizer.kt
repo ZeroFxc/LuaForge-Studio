@@ -23,6 +23,9 @@ class LuaTextTokenizer {
     private var classNames: MutableSet<String> = HashSet()
     private var shortNameMap: MutableMap<String, Boolean>? = null
     private var classNamesVersion = -1
+
+    /** 插件注册的自定义关键词集合（实例级，不污染静态 trie） */
+    private var customKeywords: MutableSet<String> = HashSet()
     
     var highlightHexColorsEnabled: Boolean = false
 
@@ -126,6 +129,16 @@ class LuaTextTokenizer {
                 }
             }
         }
+    }
+
+    /**
+     * 设置插件自定义关键词（实例级，不影响静态全局 trie）
+     *
+     * @param keywords 自定义关键词集合
+     */
+    fun setCustomKeywords(keywords: Collection<String>) {
+        this.customKeywords.clear()
+        this.customKeywords.addAll(keywords)
     }
 
     /**
@@ -672,9 +685,14 @@ class LuaTextTokenizer {
             return Tokens.CLASS_NAME
         }
 
-        // 关键词匹配
+        // 关键词匹配（静态 trie）
         if (node != null && node.token != null) {
             return node.token!!
+        }
+
+        // 插件自定义关键词匹配（实例级 HashSet O(1) 查找）
+        if (customKeywords.contains(identifier)) {
+            return Tokens.PLUGIN_KEYWORD
         }
 
         // 默认返回标识符

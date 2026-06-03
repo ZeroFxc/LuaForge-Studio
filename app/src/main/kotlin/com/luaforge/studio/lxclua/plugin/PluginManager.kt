@@ -445,6 +445,9 @@ object PluginManager {
         // 移除注册     // 移除注册的语法高亮规则
         com.luaforge.studio.lxclua.plugin.bridge.PluginSyntax.removePluginLanguages(pluginId)
         
+        // 移除编辑器装饰
+        com.luaforge.studio.lxclua.plugin.bridge.PluginDecoration.removePluginDecorations(pluginId)
+        
         // 移除该插件的所有通知
         com.luaforge.studio.lxclua.plugin.state.NotificationState.clearPlugin(pluginId)
     }

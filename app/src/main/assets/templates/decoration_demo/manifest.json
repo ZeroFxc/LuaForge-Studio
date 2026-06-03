@@ -1,0 +1,17 @@
+{
+  "id": "com.example.decoration_demo",
+  "name": "编辑器装饰示例",
+  "version": "1.0.0",
+  "description": "演示 plugin.decoration API：行背景色、Gutter 图标、Gutter 背景色的使用示例",
+  "author": "DifierLine",
+  "type": "lua",
+  "pluginType": "normal",
+  "main": "main.lua",
+  "apiVersion": 1,
+  "category": "demo",
+  "homepage": null,
+  "icon": null,
+  "dependencies": [],
+  "extendedBy": [],
+  "tags": ["decoration", "demo", "editor"]
+}

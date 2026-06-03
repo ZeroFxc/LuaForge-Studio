@@ -63,6 +63,10 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
         PluginSyntax(pluginId)
     }
     
+    private val decorationBridge by lazy {
+        PluginDecoration(pluginId)
+    }
+    
     // ==================== 基础功能 ====================
     
     override fun toast(message: String) {
@@ -1352,5 +1356,91 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
     
     override fun isLanguageRegistered(languageId: String): Boolean {
         return syntaxBridge.isLanguageRegistered(languageId)
+    }
+    
+    // ==================== 编辑器装饰 ====================
+    
+    override fun setLineBackground(line: Int, color: Int): Boolean {
+        return decorationBridge.setLineBackground(line, color)
+    }
+    
+    override fun setLineBackground(line: Int, color: Int, category: String): Boolean {
+        return decorationBridge.setLineBackground(line, color, category)
+    }
+    
+    override fun setLineBackgrounds(lines: IntArray, color: Int): Int {
+        return decorationBridge.setLineBackgrounds(lines, color)
+    }
+    
+    override fun setGutterBackground(line: Int, color: Int): Boolean {
+        return decorationBridge.setGutterBackground(line, color)
+    }
+    
+    override fun setGutterBackground(line: Int, color: Int, category: String): Boolean {
+        return decorationBridge.setGutterBackground(line, color, category)
+    }
+    
+    override fun setGutterIcon(line: Int, iconType: String): Boolean {
+        return decorationBridge.setGutterIcon(line, iconType)
+    }
+    
+    override fun setGutterIcon(line: Int, iconType: String, category: String): Boolean {
+        return decorationBridge.setGutterIcon(line, iconType, category)
+    }
+    
+    override fun removeLineDecoration(line: Int): Boolean {
+        return decorationBridge.removeLineDecoration(line)
+    }
+    
+    override fun clearMyDecorations(): Int {
+        return decorationBridge.clearMyDecorations()
+    }
+    
+    override fun getMyDecorations(): Array<Map<String, Any?>> {
+        return decorationBridge.getMyDecorations()
+    }
+    
+    override fun getLineDecorations(line: Int): Array<Map<String, Any?>> {
+        return decorationBridge.getLineDecorations(line)
+    }
+    
+    override fun setOnDecorationClick(callback: Runnable) {
+        decorationBridge.setOnDecorationClick(callback)
+    }
+    
+    override fun setOnDecorationLongClick(callback: Runnable) {
+        decorationBridge.setOnDecorationLongClick(callback)
+    }
+    
+    override fun setOnDecorationDoubleClick(callback: Runnable) {
+        decorationBridge.setOnDecorationDoubleClick(callback)
+    }
+    
+    override fun setOnGutterIconClick(callback: Runnable) {
+        decorationBridge.setOnGutterIconClick(callback)
+    }
+    
+    override fun gotoNextDecoration(): Int {
+        return decorationBridge.gotoNextDecoration()
+    }
+    
+    override fun gotoNextDecoration(category: String): Int {
+        return decorationBridge.gotoNextDecoration(category)
+    }
+    
+    override fun gotoPreviousDecoration(): Int {
+        return decorationBridge.gotoPreviousDecoration()
+    }
+    
+    override fun gotoPreviousDecoration(category: String): Int {
+        return decorationBridge.gotoPreviousDecoration(category)
+    }
+    
+    override fun getDecorationLines(): IntArray {
+        return decorationBridge.getDecorationLines()
+    }
+    
+    override fun getDecorationLines(category: String): IntArray {
+        return decorationBridge.getDecorationLines(category)
     }
 }
