@@ -447,6 +447,8 @@ object PluginManager {
         
         // 移除编辑器装饰
         com.luaforge.studio.lxclua.plugin.bridge.PluginDecoration.removePluginDecorations(pluginId)
+        // 移除装饰事件回调
+        com.luaforge.studio.lxclua.plugin.bridge.PluginDecoration.removePluginCallbacks(pluginId)
         
         // 移除该插件的所有通知
         com.luaforge.studio.lxclua.plugin.state.NotificationState.clearPlugin(pluginId)

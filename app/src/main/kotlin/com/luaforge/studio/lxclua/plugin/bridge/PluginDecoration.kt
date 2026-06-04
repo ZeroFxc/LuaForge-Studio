@@ -396,9 +396,10 @@ class PluginDecoration(private val pluginId: String) : IPluginBridgeDecoration {
 
     override fun getLineDecorations(line: Int): Array<Map<String, Any?>> {
         val filePath = activeFilePath ?: return emptyArray()
-        val key = registryKey(pluginId, filePath, line)
-        val entry = decorationRegistry[key] ?: return emptyArray()
-        return arrayOf(entry.toMap())
+        return decorationRegistry.values
+            .filter { it.filePath == filePath && it.line == line }
+            .map { it.toMap() }
+            .toTypedArray()
     }
 
     // ==================== 装饰事件监听 ====================

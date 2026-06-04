@@ -109,6 +109,8 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
 
     private val editorInstances = mutableMapOf<String, CodeEditor>()
     private val cursorListeners = mutableMapOf<String, SubscriptionReceipt<SelectionChangeEvent>>()
+    /** 装饰事件订阅: 按 filePath 存储，用于文件关闭/编辑器清理时取消订阅 */
+    private val decorationEventSubscriptions = mutableMapOf<String, List<SubscriptionReceipt<*>>>()
     private lateinit var appContext: Context
     private lateinit var stateManager: ProjectEditorStateManager
 
@@ -544,6 +546,8 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
 
     fun resetForNewProject(projectPath: String) {
         cleanupEditors()
+        // 清空装饰注册表，避免旧项目装饰数据残留
+        PluginDecoration.clearAllDecorations()
         openFiles = emptyList()
         activeFileIndex = -1
         hasShownInitialLoader = false
@@ -633,6 +637,17 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
             }
         }
         cursorListeners.clear()
+        // 取消所有装饰事件订阅
+        decorationEventSubscriptions.values.forEach { receipts ->
+            receipts.forEach { receipt ->
+                try {
+                    receipt.unsubscribe()
+                } catch (e: Exception) {
+                    LogCatcher.e("EditorViewModel", "取消订阅装饰事件失败", e)
+                }
+            }
+        }
+        decorationEventSubscriptions.clear()
         editorInstances.values.forEach { editor ->
             try {
                 (editor.parent as? ViewGroup)?.removeView(editor)
@@ -811,28 +826,29 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
         }
         cursorListeners[filePath] = receipt
 
-        // 订阅装饰事件：点击/长按/双击装饰行时触发插件回调
-        editor.subscribeEvent(ClickEvent::class.java) { event, _ ->
+        // 订阅装饰事件：点击/长按/双击装饰行时触发插件回调，按 filePath 过滤通知
+        val clickReceipt = editor.subscribeEvent(ClickEvent::class.java) { event, _ ->
             if (PluginDecoration.hasDecorationsAtLine(filePath, event.line)) {
-                PluginDecoration.notifyDecorationClick()
+                PluginDecoration.notifyDecorationClick(filePath, event.line)
             }
         }
-        editor.subscribeEvent(DoubleClickEvent::class.java) { event, _ ->
+        val doubleClickReceipt = editor.subscribeEvent(DoubleClickEvent::class.java) { event, _ ->
             if (PluginDecoration.hasDecorationsAtLine(filePath, event.line)) {
-                PluginDecoration.notifyDecorationDoubleClick()
+                PluginDecoration.notifyDecorationDoubleClick(filePath, event.line)
             }
         }
-        editor.subscribeEvent(LongPressEvent::class.java) { event, _ ->
+        val longPressReceipt = editor.subscribeEvent(LongPressEvent::class.java) { event, _ ->
             if (PluginDecoration.hasDecorationsAtLine(filePath, event.line)) {
-                PluginDecoration.notifyDecorationLongClick()
+                PluginDecoration.notifyDecorationLongClick(filePath, event.line)
             }
         }
-        editor.subscribeEvent(SideIconClickEvent::class.java) { event, _ ->
-            // 仅当点击的 gutter 图标所在行有插件装饰时才触发回调
-            if (PluginDecoration.hasDecorationsAtLine(filePath, event.clickedIcon.line)) {
-                PluginDecoration.notifyGutterIconClick()
+        val sideIconClickReceipt = editor.subscribeEvent(SideIconClickEvent::class.java) { event, _ ->
+            val clickedLine = event.clickedIcon.line
+            if (PluginDecoration.hasDecorationsAtLine(filePath, clickedLine)) {
+                PluginDecoration.notifyGutterIconClick(filePath, clickedLine)
             }
         }
+        decorationEventSubscriptions[filePath] = listOf(clickReceipt, doubleClickReceipt, longPressReceipt, sideIconClickReceipt)
         editorInstances[filePath] = editor
         return editor
     }
@@ -1196,6 +1212,10 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
             )
         }
         cursorListeners.remove(filePath)?.unsubscribe()
+        // 取消装饰事件订阅
+        decorationEventSubscriptions.remove(filePath)?.forEach { it.unsubscribe() }
+        // 清理该文件的装饰注册表数据
+        PluginDecoration.removeFileDecorations(filePath)
         openFiles.getOrNull(indexToClose)?.file?.absolutePath?.let {
             editorInstances.remove(it)?.release()
         }
