@@ -768,12 +768,14 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                         state.file.absolutePath,
                         content.toString()
                     )
-                    // 延迟到下一帧重应用装饰：clearAllPluginStyles 全量清除 sora-editor 已移位的样式，
-                    // applyToEditor 从注册表按固定行号重画，避免装饰跟随内容位移
-                    val fp = state.file.absolutePath
-                    this@apply.post {
-                        PluginDecoration.clearAllPluginStyles(this@apply)
-                        PluginDecoration.applyToEditor(this@apply, fp)
+                    // 防抖：同一帧内多次文本变更只触发一次重应用
+                    if (PluginDecoration.tryScheduleReapply()) {
+                        val fp = state.file.absolutePath
+                        this@apply.post {
+                            PluginDecoration.markReapplyDone()
+                            PluginDecoration.clearAllPluginStyles(this@apply)
+                            PluginDecoration.applyToEditor(this@apply, fp)
+                        }
                     }
                 }
 
@@ -791,11 +793,14 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                         state.file.absolutePath,
                         content.toString()
                     )
-                    // 延迟到下一帧重应用装饰，保持固定行号
-                    val fp = state.file.absolutePath
-                    this@apply.post {
-                        PluginDecoration.clearAllPluginStyles(this@apply)
-                        PluginDecoration.applyToEditor(this@apply, fp)
+                    // 防抖：同一帧内多次文本变更只触发一次重应用
+                    if (PluginDecoration.tryScheduleReapply()) {
+                        val fp = state.file.absolutePath
+                        this@apply.post {
+                            PluginDecoration.markReapplyDone()
+                            PluginDecoration.clearAllPluginStyles(this@apply)
+                            PluginDecoration.applyToEditor(this@apply, fp)
+                        }
                     }
                 }
             })
@@ -822,8 +827,11 @@ class EditorViewModel : ViewModel(), CompletionDataManager.OnCompletionDataListe
                 PluginDecoration.notifyDecorationLongClick()
             }
         }
-        editor.subscribeEvent(SideIconClickEvent::class.java) { _, _ ->
-            PluginDecoration.notifyGutterIconClick()
+        editor.subscribeEvent(SideIconClickEvent::class.java) { event, _ ->
+            // 仅当点击的 gutter 图标所在行有插件装饰时才触发回调
+            if (PluginDecoration.hasDecorationsAtLine(filePath, event.clickedIcon.line)) {
+                PluginDecoration.notifyGutterIconClick()
+            }
         }
         editorInstances[filePath] = editor
         return editor

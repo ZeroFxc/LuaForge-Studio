@@ -27,11 +27,31 @@ class PluginDecoration(private val pluginId: String) : IPluginBridgeDecoration {
         /** 全局装饰注册表: key = "pluginId|filePath|line" -> PluginDecorationEntry */
         private val decorationRegistry = mutableMapOf<String, PluginDecorationEntry>()
 
-        // ==================== 装饰事件回调 ====================
-        private var onDecorationClick: Runnable? = null
-        private var onDecorationLongClick: Runnable? = null
-        private var onDecorationDoubleClick: Runnable? = null
-        private var onGutterIconClick: Runnable? = null
+        // ==================== 装饰事件回调（按插件隔离） ====================
+        private val decorationClickCallbacks = mutableMapOf<String, Runnable>()
+        private val decorationLongClickCallbacks = mutableMapOf<String, Runnable>()
+        private val decorationDoubleClickCallbacks = mutableMapOf<String, Runnable>()
+        private val gutterIconClickCallbacks = mutableMapOf<String, Runnable>()
+
+        /** 防重复 post 标记 — 避免快速按键时堆积大量重应用回调 */
+        @Volatile
+        private var reapplyScheduled = false
+
+        /**
+         * 标记重应用已处理，允许下一次 post
+         */
+        fun markReapplyDone() {
+            reapplyScheduled = false
+        }
+
+        /**
+         * 尝试调度重应用（防抖），返回 true 表示需要执行
+         */
+        fun tryScheduleReapply(): Boolean {
+            if (reapplyScheduled) return false
+            reapplyScheduled = true
+            return true
+        }
 
         /**
          * 检查指定行是否有装饰
@@ -45,31 +65,64 @@ class PluginDecoration(private val pluginId: String) : IPluginBridgeDecoration {
         }
 
         /**
-         * 触发装饰点击事件
+         * 获取指定行上所有装饰的插件 ID 集合
+         * @param filePath 文件路径
+         * @param line 行号
+         * @return 该行有装饰的插件 ID 集合
          */
-        fun notifyDecorationClick() {
-            onDecorationClick?.run()
+        private fun getPluginIdsAtLine(filePath: String, line: Int): Set<String> {
+            return decorationRegistry.values
+                .filter { it.filePath == filePath && it.line == line }
+                .map { it.pluginId }
+                .toSet()
         }
 
         /**
-         * 触发装饰长按事件
+         * 触发装饰点击事件 — 仅通知在指定行有装饰的插件
+         * @param filePath 当前文件路径
+         * @param line 点击的行号
          */
-        fun notifyDecorationLongClick() {
-            onDecorationLongClick?.run()
+        fun notifyDecorationClick(filePath: String, line: Int) {
+            val pluginIds = getPluginIdsAtLine(filePath, line)
+            decorationClickCallbacks.forEach { (pluginId, callback) ->
+                if (pluginId in pluginIds) callback.run()
+            }
         }
 
         /**
-         * 触发装饰双击事件
+         * 触发装饰长按事件 — 仅通知在指定行有装饰的插件
+         * @param filePath 当前文件路径
+         * @param line 长按的行号
          */
-        fun notifyDecorationDoubleClick() {
-            onDecorationDoubleClick?.run()
+        fun notifyDecorationLongClick(filePath: String, line: Int) {
+            val pluginIds = getPluginIdsAtLine(filePath, line)
+            decorationLongClickCallbacks.forEach { (pluginId, callback) ->
+                if (pluginId in pluginIds) callback.run()
+            }
         }
 
         /**
-         * 触发 gutter 图标点击事件
+         * 触发装饰双击事件 — 仅通知在指定行有装饰的插件
+         * @param filePath 当前文件路径
+         * @param line 双击的行号
          */
-        fun notifyGutterIconClick() {
-            onGutterIconClick?.run()
+        fun notifyDecorationDoubleClick(filePath: String, line: Int) {
+            val pluginIds = getPluginIdsAtLine(filePath, line)
+            decorationDoubleClickCallbacks.forEach { (pluginId, callback) ->
+                if (pluginId in pluginIds) callback.run()
+            }
+        }
+
+        /**
+         * 触发 gutter 图标点击事件 — 仅通知在指定行有装饰的插件
+         * @param filePath 当前文件路径
+         * @param line 点击 Gutter 图标的行号
+         */
+        fun notifyGutterIconClick(filePath: String, line: Int) {
+            val pluginIds = getPluginIdsAtLine(filePath, line)
+            gutterIconClickCallbacks.forEach { (pluginId, callback) ->
+                if (pluginId in pluginIds) callback.run()
+            }
         }
 
         /**
@@ -133,14 +186,51 @@ class PluginDecoration(private val pluginId: String) : IPluginBridgeDecoration {
         }
 
         /**
-         * 移除指定插件的所有装饰数据
+         * 移除指定插件的所有装饰数据，并立即刷新当前编辑器
          * @param pluginId 插件 ID
          * @return 被移除的装饰数量
          */
         fun removePluginDecorations(pluginId: String): Int {
             val keys = decorationRegistry.filter { it.value.pluginId == pluginId }.keys
             keys.forEach { decorationRegistry.remove(it) }
+            // 立即刷新当前编辑器，确保装饰从视图上移除
+            val editor = PluginManager.activeViewModel?.getActiveEditor()
+            val filePath = PluginManager.activeViewModel?.activeFileState?.file?.absolutePath
+            if (editor != null && filePath != null) {
+                clearAllPluginStyles(editor)
+                applyToEditor(editor, filePath)
+                editor.postInvalidate()
+            }
             return keys.size
+        }
+
+        /**
+         * 清理指定插件注册的所有事件回调
+         * @param pluginId 插件 ID
+         */
+        fun removePluginCallbacks(pluginId: String) {
+            decorationClickCallbacks.remove(pluginId)
+            decorationLongClickCallbacks.remove(pluginId)
+            decorationDoubleClickCallbacks.remove(pluginId)
+            gutterIconClickCallbacks.remove(pluginId)
+        }
+
+        /**
+         * 移除指定文件的所有装饰数据（用于文件关闭时清理）
+         * @param filePath 文件路径
+         * @return 被移除的装饰数量
+         */
+        fun removeFileDecorations(filePath: String): Int {
+            val keys = decorationRegistry.filter { it.value.filePath == filePath }.keys
+            keys.forEach { decorationRegistry.remove(it) }
+            return keys.size
+        }
+
+        /**
+         * 清空所有装饰注册表（用于项目切换时清理）
+         */
+        fun clearAllDecorations() {
+            decorationRegistry.clear()
         }
 
         /**
@@ -183,7 +273,9 @@ class PluginDecoration(private val pluginId: String) : IPluginBridgeDecoration {
     // ==================== 公开方法 ====================
 
     override fun setLineBackground(line: Int, color: Int): Boolean {
-        return setLineBackground(line, color, "default")
+        val key = registryKey(pluginId, activeFilePath ?: return false, line)
+        val existing = decorationRegistry[key]
+        return setLineBackground(line, color, existing?.category ?: "default")
     }
 
     override fun setLineBackground(line: Int, color: Int, category: String): Boolean {
@@ -213,7 +305,9 @@ class PluginDecoration(private val pluginId: String) : IPluginBridgeDecoration {
     }
 
     override fun setGutterBackground(line: Int, color: Int): Boolean {
-        return setGutterBackground(line, color, "default")
+        val key = registryKey(pluginId, activeFilePath ?: return false, line)
+        val existing = decorationRegistry[key]
+        return setGutterBackground(line, color, existing?.category ?: "default")
     }
 
     override fun setGutterBackground(line: Int, color: Int, category: String): Boolean {
@@ -235,7 +329,9 @@ class PluginDecoration(private val pluginId: String) : IPluginBridgeDecoration {
     }
 
     override fun setGutterIcon(line: Int, iconType: String): Boolean {
-        return setGutterIcon(line, iconType, "default")
+        val key = registryKey(pluginId, activeFilePath ?: return false, line)
+        val existing = decorationRegistry[key]
+        return setGutterIcon(line, iconType, existing?.category ?: "default")
     }
 
     override fun setGutterIcon(line: Int, iconType: String, category: String): Boolean {
@@ -308,19 +404,19 @@ class PluginDecoration(private val pluginId: String) : IPluginBridgeDecoration {
     // ==================== 装饰事件监听 ====================
 
     override fun setOnDecorationClick(callback: Runnable) {
-        onDecorationClick = callback
+        decorationClickCallbacks[pluginId] = callback
     }
 
     override fun setOnDecorationLongClick(callback: Runnable) {
-        onDecorationLongClick = callback
+        decorationLongClickCallbacks[pluginId] = callback
     }
 
     override fun setOnDecorationDoubleClick(callback: Runnable) {
-        onDecorationDoubleClick = callback
+        decorationDoubleClickCallbacks[pluginId] = callback
     }
 
     override fun setOnGutterIconClick(callback: Runnable) {
-        onGutterIconClick = callback
+        gutterIconClickCallbacks[pluginId] = callback
     }
 
     // ==================== 装饰导航 ====================
@@ -391,12 +487,12 @@ class PluginDecoration(private val pluginId: String) : IPluginBridgeDecoration {
 
     // ==================== 编辑器刷新 ====================
 
-    /** 刷新指定文件编辑器上的装饰 */
+    /** 刷新指定文件编辑器上的装饰（全量清除后重应用，避免 sora-editor 移位导致重复） */
     private fun refreshEditorDecorations(filePath: String) {
         val editor = PluginManager.activeViewModel?.getActiveEditor() ?: return
         val activeFile = activeFilePath
         if (activeFile == filePath) {
-            clearFromEditor(editor, filePath)
+            clearAllPluginStyles(editor)
             applyToEditor(editor, filePath)
             editor.postInvalidate()
         }
