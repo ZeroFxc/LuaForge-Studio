@@ -1,0 +1,46 @@
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
+
+apply from: project(':').file('javadoc.gradle')
+apply from: project(':').file('pom.gradle')
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+afterEvaluate { project ->
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+                versionMapping {
+                    usage('java-api') {
+                        fromResolutionOf('runtimeClasspath')
+                    }
+                    usage('java-runtime') {
+                        fromResolutionResult()
+                    }
+                }
+            }
+
+            withType(MavenPublication).configureEach {
+                setPom(pom, '')
+            }
+        }
+
+        repositories {
+            mavenLocal()
+        }
+    }
+
+    configure(signing) {
+        def key = System.getenv("GPG_SECKEY")
+        useInMemoryPgpKeys(
+                System.getenv("GPG_KEY_ID"),
+                key == null ? null : new String(Base64.getDecoder().decode(key)),
+                System.getenv("GPG_PASSPHRASE"),
+        )
+        sign(publishing.publications)
+    }
+}

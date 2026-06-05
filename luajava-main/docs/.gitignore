@@ -1,0 +1,8 @@
+node_modules/
+.temp
+.cache
+.pnp.*
+.vitepress/cache
+.vitepress/dist
+.vitepress/luajava
+public/javadoc

@@ -1,0 +1,53 @@
+/*
+ * Copyright (c) 2011-2021 VMware Inc. or its affiliates, All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+apply plugin: 'java-library'
+
+java {
+    toolchain {
+        // We generally don't care about the toolchain version as long as
+        // it is Java 8 compatible.
+        // But older Javadoc will fail because online links are moving away
+        // from package-list to element-list.
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+javadoc {
+    dependsOn jar
+    group = 'documentation'
+    description = 'Generates aggregated Javadoc API documentation.'
+
+    title = "${project.name} $project.version"
+    (options as StandardJavadocDocletOptions).with {
+        header = "$project.name"
+        encoding = 'UTF-8'
+        memberLevel = JavadocMemberLevel.PROTECTED
+        linksOffline(
+                "https://docs.oracle.com/javase/8/docs/api/",
+                "https://docs.oracle.com/en/java/javase/25/docs/api/",
+        )
+        linksOffline(
+                "https://javadoc.io/doc/com.badlogicgames.jnigen/jnigen-loader/3.1.1/",
+                "https://javadoc.io/doc/com.badlogicgames.jnigen/jnigen-loader/3.1.1/",
+        )
+
+        tags = ['apiNote:a:API Note:', 'implSpec:a:Implementation Requirements:',
+                'implNote:a:Implementation Note:']
+    }
+
+    classpath += sourceSets.main.compileClasspath
+}

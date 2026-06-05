@@ -1,0 +1,87 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'jacoco'
+    id 'com.gradleup.shadow' version '8.3.5'
+    id 'me.champeau.jmh' version '0.7.3'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = 'https://jitpack.io'
+    }
+}
+
+ext {
+    jlineVersion = '3.30.6'
+    jUnitVersion = '5.10.2'
+}
+
+java {
+    withSourcesJar()
+}
+
+dependencies {
+    jmh project(':luajava')
+    jmh project(':luaj')
+    jmh project(':lua54')
+    jmh project(':luajit')
+    jmh project(path: ':lua54', configuration: 'desktopNatives')
+    jmh project(path: ':luajit', configuration: 'desktopNatives')
+    implementation project(':luajava')
+    implementation project(':lua51')
+    implementation project(':lua52')
+    implementation project(':lua53')
+    implementation project(':lua54')
+    implementation project(':lua55')
+    implementation project(':luajit')
+    implementation project(':luaj')
+    implementation 'com.github.wagyourtail.luaj:luaj-core:f062b53a34'
+    implementation project(':example:suite')
+    implementation project(path: ':lua51', configuration: 'desktopNatives')
+    implementation project(path: ':lua52', configuration: 'desktopNatives')
+    implementation project(path: ':lua53', configuration: 'desktopNatives')
+    implementation project(path: ':lua54', configuration: 'desktopNatives')
+    implementation project(path: ':lua55', configuration: 'desktopNatives')
+    implementation project(path: ':luajit', configuration: 'desktopNatives')
+    implementation 'info.picocli:picocli:4.7.6'
+    implementation 'org.antlr:antlr4-runtime:4.13.0'
+    implementation "org.jline:jline-reader:$jlineVersion"
+    implementation "org.jline:jline-console:$jlineVersion"
+    implementation "org.jline:jline-terminal:$jlineVersion"
+    implementation "org.jline:jline-builtins:$jlineVersion"
+    implementation "org.jline:jline-terminal-jansi:$jlineVersion"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:$jUnitVersion"
+    testImplementation "org.junit.jupiter:junit-jupiter-params:$jUnitVersion"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$jUnitVersion"
+}
+
+jmh {
+    benchmarkMode = ['avgt']
+    fork = 1
+    iterations = 3
+    profilers = ['perfasm']
+    warmupIterations = 2
+    timeUnit = 'ns'
+}
+
+test {
+    useJUnitPlatform()
+
+    jvmArgs ["--illegal-access=debug"]
+
+    jacoco {
+        destinationFile = project(':').layout.buildDirectory.file('jacoco/test.exec').get().asFile
+    }
+
+    testLogging {
+        showStackTraces = true
+        exceptionFormat = 'full'
+    }
+
+}
+
+application {
+    mainClass = 'party.iroiro.luajava.Console'
+}

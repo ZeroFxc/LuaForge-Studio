@@ -1,0 +1,97 @@
+group = 'party.iroiro.luajava'
+version = System.getenv('IS_RELEASE') == 'true' ? '4.1.0' : '4.1.0-SNAPSHOT'
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+
+    dependencies {
+        classpath 'com.android.library:com.android.library.gradle.plugin:8.13.2'
+        classpath 'com.badlogicgames.jnigen:jnigen-gradle:3.1.1'
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+subprojects { it ->
+    repositories {
+        mavenCentral()
+    }
+
+    if (!['android', 'android-test', 'jpms-example'].contains(it.name)) {
+        apply plugin: 'java'
+        tasks.withType(JavaCompile).configureEach {
+            options.release = 8
+            options.encoding = 'UTF-8'
+        }
+    }
+}
+
+apply from: 'jacoco.gradle'
+
+configure([
+        project(':luajava'),
+        project(':lua51'),
+        project(':lua52'),
+        project(':lua53'),
+        project(':lua54'),
+        project(':lua55'),
+        project(':luajit'),
+        project(':luaj'),
+        project(':jsr223')
+]) {
+    apply from: project(':').file('publish.gradle')
+}
+
+
+apply plugin: 'java'
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+// Javadoc configs. See javadoc.gradle.
+tasks.register('allJavadoc', Javadoc) {
+    Set<String> projects = [
+            'lua51',
+            'lua52',
+            'lua53',
+            'lua54',
+            'lua55',
+            'luajit',
+            'luaj',
+            'luajava',
+    ]
+    source subprojects
+            .findAll { projects.contains(it.name) }
+            .collect { it.sourceSets.main.allJava }
+    classpath = files(subprojects.findAll { projects.contains(it.name) }
+            .collect { it.sourceSets.main.compileClasspath })
+    exclude(
+            '**/party/iroiro/luajava/util/**',
+            '**/party/iroiro/luajava/cleaner/**',
+    )
+    destinationDir = layout.buildDirectory.file("docs/javadoc").get().asFile
+
+    title = "${project.name} $version"
+    (options as StandardJavadocDocletOptions).with {
+        header = "$project.name"
+        encoding = 'UTF-8'
+        memberLevel = JavadocMemberLevel.PROTECTED
+        linksOffline(
+                "https://docs.oracle.com/javase/8/docs/api/",
+                "https://docs.oracle.com/en/java/javase/25/docs/api/",
+        )
+        linksOffline(
+                "https://javadoc.io/doc/com.badlogicgames.jnigen/jnigen-loader/3.1.1/",
+                "https://javadoc.io/doc/com.badlogicgames.jnigen/jnigen-loader/3.1.1/",
+        )
+    }
+}

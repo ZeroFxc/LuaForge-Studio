@@ -1,0 +1,26 @@
+subprojects {
+    if (!['example', 'android', 'android-test', 'jsr223', 'jpms-example'].contains(project.name)) {
+        apply plugin: 'jacoco'
+
+        jacocoTestReport {
+            dependsOn layout.buildDirectory.files('jacoco/*.exec')
+
+            executionData.setFrom(project(':').layout.buildDirectory.files('jacoco/*.exec'))
+
+            reports {
+                xml.required = true
+                html.required = true
+                csv.required = true
+                xml.outputLocation = layout.buildDirectory.file('reports/jacoco/report.xml')
+            }
+
+            afterEvaluate {
+                classDirectories.setFrom(files(classDirectories.files.collect {
+                    fileTree(dir: it, exclude: '**/party/iroiro/luajava/util/**')
+                }))
+            }
+        }
+
+        jacocoTestReport.shouldRunAfter project(':example').tasks.named('test')
+    }
+}
