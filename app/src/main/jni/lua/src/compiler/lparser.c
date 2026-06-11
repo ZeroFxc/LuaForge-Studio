@@ -3064,8 +3064,9 @@ static void primaryexp (LexState *ls, expdesc *v) {
             is_arrow = 1;
          }
       }
-      /* Case: (name, ...) => */
-      else if ((la1 == TK_NAME || la1 == TK_DOTS || is_type_token(la1)) && luaX_lookahead2(ls) == ',') {
+      /* Case: (name, ...) => — 仅当不在 infix 参数位置时检测，否则会误把函数调用参数当箭头 */
+      else if ((la1 == TK_NAME || la1 == TK_DOTS || is_type_token(la1)) && luaX_lookahead2(ls) == ',' &&
+               !(ls->expr_flags & E_INFIX_ARG)) {
          is_arrow = 1;
       }
 
@@ -3216,7 +3217,15 @@ static void primaryexp (LexState *ls, expdesc *v) {
           return;
       }
 
-      expr(ls, v);
+      /* 在 infix 参数位置，(arg...) 应被解析为函数调用参数列表，而非单个括号表达式 */
+      if (old_flags & E_INFIX_ARG) {
+        if (ls->t.token == ')')
+          v->k = VVOID;
+        else
+          explist(ls, v);
+      } else {
+        expr(ls, v);
+      }
       ls->expr_flags = old_flags;
       check_match(ls, ')', '(', line);
       luaK_dischargevars(ls->fs, v);
@@ -5042,7 +5051,10 @@ static BinOpr subexpr (LexState *ls, expdesc *v, int limit) {
             codestring(&key, method);
             luaK_self(ls->fs, v, &key);
           }
+          int old_ifx = ls->expr_flags;
+          ls->expr_flags |= E_INFIX_ARG;
           nextop = subexpr(ls, &v2, priority[OPR_INFIX].right);
+          ls->expr_flags = old_ifx;
           {
             int base = v->u.info;
             if (hasmultret(v2.k))
@@ -5166,7 +5178,10 @@ static BinOpr subexpr (LexState *ls, expdesc *v, int limit) {
         luaK_self(ls->fs, v, &key);
       }
       /* 解析参数表达式 */
+      int old_ifx2 = ls->expr_flags;
+      ls->expr_flags |= E_INFIX_ARG;
       nextop = subexpr(ls, &v2, priority[OPR_INFIX].right);
+      ls->expr_flags = old_ifx2;
       /* 生成函数调用 */
       {
         int base = v->u.info;
@@ -5536,7 +5551,10 @@ static BinOpr cond_subexpr (LexState *ls, expdesc *v, int limit) {
         codestring(&key, method);
         luaK_self(ls->fs, v, &key);
       }
+      int old_ifx3 = ls->expr_flags;
+      ls->expr_flags |= E_INFIX_ARG;
       nextop = cond_subexpr(ls, &v2, priority[OPR_INFIX].right);
+      ls->expr_flags = old_ifx3;
       {
         int base = v->u.info;
         if (hasmultret(v2.k))
@@ -11744,7 +11762,10 @@ static void exprstat (LexState *ls) {
       if (has_arg) {
         /* 解析参数 (使用 infix 优先级限制) */
         expdesc v2;
+        int old_ifx4 = ls->expr_flags;
+        ls->expr_flags |= E_INFIX_ARG;
         BinOpr nextop = subexpr(ls, &v2, priority[OPR_INFIX].right);
+        ls->expr_flags = old_ifx4;
         /* 生成函数调用 */
         int base = v.v.u.info;
         if (hasmultret(v2.k))

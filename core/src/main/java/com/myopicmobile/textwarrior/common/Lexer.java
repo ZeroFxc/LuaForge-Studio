@@ -431,6 +431,10 @@ public class Lexer {
                                 //函数名
                                 tokens.add(new Pair(len, LITERAL));
                                 language.addUserWord(name);
+                            } else if (lastType == LuaTokenTypes.COLON || lastType == LuaTokenTypes.NAME) {
+                                // 冒号方法调用 s:method() 或中缀方法调用 s method arg
+                                tokens.add(new Pair(len, LITERAL));
+                                language.addUserWord(name);
                             } else if (language.isUserWord(name)) {
                                 tokens.add(new Pair(len, LITERAL));
                             } else if (lastType == LuaTokenTypes.GOTO || lastType == LuaTokenTypes.AT) {

@@ -423,7 +423,7 @@ object SettingsManager {
 }
 
 data class SettingsData(
-    val themeType: ThemeType = ThemeType.GREEN,
+    val themeType: ThemeType = ThemeType.BLUE,
     val darkMode: DarkMode = DarkMode.FOLLOW_SYSTEM,
     val projectStoragePath: String = "/storage/emulated/0/LXC-LUA/project/",
     val additionalProjectPaths: List<String> = emptyList(),

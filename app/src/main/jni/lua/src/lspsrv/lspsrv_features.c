@@ -534,6 +534,13 @@ int lsp_document_highlight(LspDocument *doc, int line, int col, int **out_kinds,
 ** LXCLUA LSP - Document Symbol Provider
 */
 
+/* 容器符号类型判断：用于 documentSymbol 嵌套层级计算 */
+static int is_container(int kind) {
+    return kind == SYMBOL_FUNCTION || kind == SYMBOL_STRUCT || 
+           kind == SYMBOL_ENUM || kind == SYMBOL_NAMESPACE || 
+           kind == SYMBOL_CLASS || kind == SYMBOL_MODULE;
+}
+
 /*
  * @brief 生成文档符号（大纲视图，带层级嵌套）
  * @param doc 文档指针
@@ -549,13 +556,6 @@ int lsp_document_symbol(LspDocument *doc, LspSymbol ***out_symbols) {
     /* 第一步：找出所有容器符号的结束行 */
     int *scope_end = (int *)lsp_alloc(n * sizeof(int));
     for (int i = 0; i < n; i++) scope_end[i] = -1;
-    
-    /* 容器符号类型 */
-    int is_container(int kind) {
-        return kind == SYMBOL_FUNCTION || kind == SYMBOL_STRUCT || 
-               kind == SYMBOL_ENUM || kind == SYMBOL_NAMESPACE || 
-               kind == SYMBOL_CLASS || kind == SYMBOL_MODULE;
-    }
     
     /* 为每个容器符号找对应的 END token */
     if (doc->tokens && doc->ntokens > 0) {
