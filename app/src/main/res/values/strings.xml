@@ -392,9 +392,17 @@
     <string name="code_editor_close_all">关闭全部</string>
     <string name="code_editor_bottom_area_content">底部区域内容</string>
     <string name="code_editor_build_success">构建成功</string>
+    <string name="code_editor_build_cancelled">构建已取消</string>
     <string name="code_editor_apk_built">APK 构建成功！</string>
     <string name="code_editor_apk_path">%s</string>
     <string name="code_editor_install_prompt">是否立即安装此 APK？</string>
+    <string name="build_cancelled_message">已取消本次构建，项目未发生变化。</string>
+    <string name="build_error_message">构建过程发生错误，请查看错误信息：</string>
+    <string name="editor_build_failed_title">构建失败</string>
+    <string name="webui_load_error">页面加载失败</string>
+    <string name="webui_retry">重试</string>
+    <string name="webui_unknown_error">未知错误</string>
+    <string name="refresh">刷新</string>
     <string name="code_editor_install">安装</string>
     <string name="code_editor_compile_success">编译成功！编译文件: %s</string>
     <string name="code_editor_compile_failed">编译失败: %s</string>
@@ -705,4 +713,54 @@
     <string name="plugin_dependency_version_mismatch">依赖 %1$s 版本要求 %2$s，当前版本 %3$s</string>
     <string name="plugin_dependency_disabled">必需依赖 %s 未启用</string>
     <string name="plugin_dependency_check_passed">依赖检查通过</string>
+
+    <!-- 插件管理界面 - 主页面 -->
+    <string name="plugin_management_title">插件管理</string>
+    <string name="plugin_tab_all">全部</string>
+    <string name="plugin_tab_core">核心</string>
+    <string name="plugin_tab_normal">普通</string>
+    <string name="plugin_tab_extension">扩展</string>
+    <string name="plugin_tab_dependent">依赖</string>
+    <string name="plugin_tab_disabled">未启用</string>
+    <string name="plugin_stats_total">总计</string>
+    <string name="plugin_stats_enabled">已启用</string>
+    <string name="plugin_stats_core">核心</string>
+    <string name="plugin_stats_disabled">未启用</string>
+    <string name="plugin_import_button">导入插件</string>
+    <string name="plugin_uninstall_title">卸载插件</string>
+    <string name="plugin_uninstall_confirm">确定要卸载「%s」吗？</string>
+    <string name="plugin_uninstall_warning">此操作将删除插件目录及所有数据，包括日志和配置。</string>
+    <string name="plugin_uninstall_enabled_hint">该插件当前已启用，将先停用再卸载。</string>
+    <string name="plugin_uninstall_btn">卸载</string>
+    <string name="plugin_context_menu_title">操作: %s</string>
+    <string name="plugin_open_webui">打开 Web 界面</string>
+    <string name="plugin_reload">重载插件</string>
+    <string name="plugin_export">导出插件</string>
+    <string name="plugin_card_webui_button">Web 界面</string>
+    <string name="plugin_card_reload_button">重载</string>
+    <string name="plugin_card_uninstall_button">卸载</string>
+    <string name="plugin_info_id">ID</string>
+    <string name="plugin_info_type">类型</string>
+    <string name="plugin_info_entry">入口</string>
+    <string name="plugin_info_api_version">API 版本</string>
+    <string name="plugin_info_homepage">主页</string>
+    <string name="plugin_deps_title">依赖 (%d):</string>
+    <string name="plugin_deps_required">(必需)</string>
+    <string name="plugin_deps_optional">(可选)</string>
+    <string name="plugin_dependents_title">被以下插件依赖 (%d):</string>
+    <string name="plugin_tags_title">标签 (%d):</string>
+    <string name="plugin_no_webui">插件未提供 Web 界面\n(缺少 web/%s)</string>
+
+    <!-- 安装版本比对 -->
+    <string name="plugin_install_exists_title">插件已存在</string>
+    <string name="plugin_install_exists_msg">已安装版本: %1$s\n新版本: %2$s\n\n是否替换现有版本？</string>
+    <string name="plugin_install_same_version">版本相同 (%s)，是否重新安装？</string>
+    <string name="plugin_install_downgrade">当前版本 (%1$s) 高于安装版本 (%2$s)，是否降级安装？</string>
+
+    <!-- 依赖检查 -->
+    <string name="plugin_dep_missing_title">缺少依赖</string>
+    <string name="plugin_dep_missing_msg">插件 \"%1$s\" 需要以下依赖才能启用:\n%2$s\n\n是否仍然启用？</string>
+    <string name="plugin_dep_version_low">版本不满足: %1$s (需要 &gt;= %2$s，当前 %3$s)</string>
+    <string name="plugin_dep_not_found">未找到: %1$s</string>
+    <string name="plugin_dep_disabled">未启用: %1$s</string>
 </resources>

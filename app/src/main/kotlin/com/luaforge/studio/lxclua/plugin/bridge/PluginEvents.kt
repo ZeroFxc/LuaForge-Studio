@@ -59,6 +59,37 @@ class PluginEvents(private val pluginId: String) {
     val ON_PROJECT_SWIPE_LEFT = "onProjectSwipeLeft"
     val ON_PROJECT_SWIPE_RIGHT = "onProjectSwipeRight"
     
+    // 依赖事件
+    /**
+     * 依赖缺失事件，启用插件时必需依赖不满足时触发
+     * 参数: (pluginId: String, missingDepsJson: String)
+     */
+    val ON_DEPENDENCY_MISSING = "onDependencyMissing"
+    
+    // 属性变更事件
+    /**
+     * 插件属性变更事件，updatePluginName/Description 等调用成功后触发
+     * 参数: (pluginId: String, changedFieldsJson: String)
+     */
+    val ON_PLUGIN_PROPERTY_CHANGED = "onPluginPropertyChanged"
+    
+    // 安装相关事件
+    /**
+     * 安装版本冲突事件，安装时已存在旧版本时触发
+     * 参数: (pluginId: String, existingVersion: String, newVersion: String, isUpdate: Boolean)
+     */
+    val ON_INSTALL_VERSION_CONFLICT = "onInstallVersionConflict"
+    
     // UI 交互事件
     val ON_BACK_PRESSED = "onBackPressed"
+    /** 插件管理页面中插件卡片被单击，参数: (pluginId: String) */
+    val ON_PLUGIN_CARD_CLICK = "onPluginCardClick"
+
+    // 构建事件
+    /** 构建开始，参数: (projectPath: String, buildType: String) buildType 为 "project" 或 "compile" */
+    val ON_BUILD_START = "onBuildStart"
+    /** 构建完成，参数: (projectPath: String, result: String, success: Boolean) */
+    val ON_BUILD_FINISH = "onBuildFinish"
+    /** 构建出错，参数: (projectPath: String, errorMessage: String, buildType: String) */
+    val ON_BUILD_ERROR = "onBuildError"
 }

@@ -23,14 +23,39 @@ import java.util.UUID
 
 /**
  * 已加载插件包装类
+ * 
+ * enabled 使用 MutableState 确保 Compose 能直接感知状态变化，
+ * 避免列表 item 替换导致的 Switch 动画闪烁
  */
-data class LoadedPlugin(
+class LoadedPlugin(
     val manifest: PluginManifest,
     val directory: File,
-    var enabled: Boolean,
+    initialEnabled: Boolean,
     var luaState: LuaState? = null,
     var dexPlugin: IPlugin? = null
-)
+) {
+    /** Compose 可观察的启用状态，Switch 直接绑定此值，避免列表复用时状态闪烁 */
+    val enabled = mutableStateOf(initialEnabled)
+
+    /**
+     * 创建副本（替代 data class 的 copy）
+     * @param manifest 新 manifest，默认沿用当前
+     * @param directory 新目录，默认沿用当前
+     * @param enabled 新启用状态（Boolean），默认沿用当前值
+     * @param luaState 新 LuaState，默认沿用当前
+     * @param dexPlugin 新 dexPlugin，默认沿用当前
+     * @return 新的 LoadedPlugin 实例
+     */
+    fun copy(
+        manifest: PluginManifest = this.manifest,
+        directory: File = this.directory,
+        enabled: Boolean = this.enabled.value,
+        luaState: LuaState? = this.luaState,
+        dexPlugin: IPlugin? = this.dexPlugin
+    ): LoadedPlugin {
+        return LoadedPlugin(manifest, directory, enabled, luaState, dexPlugin)
+    }
+}
 
 /**
  * 插件管理引擎单例
@@ -260,7 +285,7 @@ object PluginManager {
     fun loadEnabledPlugins() {
         // 先加载核心插件
         for (plugin in loadedPlugins) {
-            if (plugin.enabled && isCorePlugin(plugin) && plugin.luaState == null && plugin.dexPlugin == null) {
+            if (plugin.enabled.value && isCorePlugin(plugin) && plugin.luaState == null && plugin.dexPlugin == null) {
                 try {
                     loadPluginInternal(plugin)
                 } catch (e: Exception) {
@@ -271,7 +296,7 @@ object PluginManager {
         
         // 然后加载普通插件（按依赖顺序）
         for (plugin in loadedPlugins) {
-            if (plugin.enabled && !isCorePlugin(plugin) && plugin.luaState == null && plugin.dexPlugin == null) {
+            if (plugin.enabled.value && !isCorePlugin(plugin) && plugin.luaState == null && plugin.dexPlugin == null) {
                 try {
                     loadPluginInternal(plugin)
                 } catch (e: Exception) {
@@ -320,7 +345,7 @@ object PluginManager {
                 }
             }
             
-            if (!depPlugin.enabled) {
+            if (!depPlugin.enabled.value) {
                 if (dep.required) {
                     return Pair(false, context?.getString(R.string.plugin_dependency_disabled, dep.pluginId)
                         ?: "必需依赖 ${dep.pluginId} 未启用")
@@ -352,7 +377,7 @@ object PluginManager {
     /**
      * 单个插件加载逻辑（带依赖检查）
      */
-    private fun loadPluginInternal(plugin: LoadedPlugin) {
+    internal fun loadPluginInternal(plugin: LoadedPlugin) {
         val context = appContext ?: return
         val manifest = plugin.manifest
         
@@ -379,7 +404,7 @@ object PluginManager {
     /**
      * 单个插件卸载逻辑
      */
-    private fun unloadPluginInternal(plugin: LoadedPlugin) {
+    internal fun unloadPluginInternal(plugin: LoadedPlugin) {
         val pluginId = plugin.manifest.id
         
         try {
@@ -494,15 +519,54 @@ object PluginManager {
     fun setPluginEnabled(context: Context, pluginId: String, enabled: Boolean) {
         val plugin = loadedPlugins.find { it.manifest.id == pluginId }
         if (plugin != null) {
-            plugin.enabled = enabled
+            if (enabled) {
+                // 检查缺失的必需依赖并触发事件
+                val missing = getMissingDependencies(pluginId)
+                if (missing.isNotEmpty()) {
+                    EventManager.fireEvent(PluginEvents.ON_DEPENDENCY_MISSING,
+                        pluginId, missing.joinToString(","))
+                }
+                // 级联启用：先启用所有必需依赖
+                cascadeEnable(context, plugin.manifest)
+            }
+            
+            plugin.enabled.value = enabled
             getPrefs(context).edit()
                 .putBoolean(PREF_ENABLED_PREFIX + pluginId, enabled)
                 .apply()
             
             if (enabled) {
                 loadPluginInternal(plugin)
+                EventManager.fireEvent(PluginEvents.ON_PLUGIN_ENABLED, pluginId)
             } else {
                 unloadPluginInternal(plugin)
+                EventManager.fireEvent(PluginEvents.ON_PLUGIN_DISABLED, pluginId)
+            }
+        }
+    }
+
+    /**
+     * 级联启用插件的所有必需依赖
+     * 递归处理：如果依赖的插件也有自己的依赖，同样级联启用
+     */
+    private fun cascadeEnable(context: Context, manifest: PluginManifest, depth: Int = 0) {
+        if (depth > 10) return // 防止循环依赖导致无限递归
+        for (dep in manifest.dependencies) {
+            if (!dep.required) continue // 只处理必需依赖
+            val depPlugin = loadedPlugins.find { it.manifest.id == dep.pluginId }
+            if (depPlugin != null && !depPlugin.enabled.value) {
+                // 先递归处理依赖的依赖
+                cascadeEnable(context, depPlugin.manifest, depth + 1)
+                depPlugin.enabled.value = true
+                getPrefs(context).edit()
+                    .putBoolean(PREF_ENABLED_PREFIX + dep.pluginId, true)
+                    .apply()
+                try {
+                    loadPluginInternal(depPlugin)
+                    EventManager.fireEvent(PluginEvents.ON_PLUGIN_ENABLED, dep.pluginId)
+                } catch (e: Exception) {
+                    android.util.Log.e("PluginManager", "级联启用依赖失败: ${dep.pluginId}", e)
+                }
             }
         }
     }
@@ -528,23 +592,25 @@ object PluginManager {
         val index = loadedPlugins.indexOfFirst { it.manifest.id == pluginId }
         if (index != -1) {
             val plugin = loadedPlugins[index]
-            
+
             getPrefs(context).edit()
                 .putBoolean(PREF_ENABLED_PREFIX + pluginId, enabled)
                 .apply()
-                
+
             if (enabled) {
                 try {
                     loadPluginInternal(plugin)
+                    EventManager.fireEvent(PluginEvents.ON_PLUGIN_ENABLED, pluginId)
                 } catch (e: Exception) {
                     android.util.Log.e("PluginManager", "动态启用插件失败: $pluginId", e)
                 }
             } else {
                 unloadPluginInternal(plugin)
+                EventManager.fireEvent(PluginEvents.ON_PLUGIN_DISABLED, pluginId)
             }
-            
-            val updatedPlugin = plugin.copy(enabled = enabled)
-            loadedPlugins[index] = updatedPlugin
+
+            // 直接修改 MutableState 值，触发 Compose 细粒度重组，避免全量 item 替换导致的 Switch 闪烁
+            plugin.enabled.value = enabled
         }
     }
     
@@ -605,6 +671,10 @@ object PluginManager {
             val destDir = File(pluginsDir, manifest.id)
             
             if (destDir.exists()) {
+                val preCheck = preCheckInstall(manifest)
+                EventManager.fireEvent(PluginEvents.ON_INSTALL_VERSION_CONFLICT,
+                    manifest.id, preCheck.existingVersion ?: "?", manifest.version,
+                    preCheck.isUpdate, preCheck.isDowngrade.toString())
                 togglePlugin(context, manifest.id, false)
                 getPrefs(context).edit().remove(PREF_ENABLED_PREFIX + manifest.id).apply()
             }
@@ -641,6 +711,10 @@ object PluginManager {
             val destDir = File(pluginsDir, manifest.id)
             
             if (destDir.exists()) {
+                val preCheck = preCheckInstall(manifest)
+                EventManager.fireEvent(PluginEvents.ON_INSTALL_VERSION_CONFLICT,
+                    manifest.id, preCheck.existingVersion ?: "?", manifest.version,
+                    preCheck.isUpdate, preCheck.isDowngrade.toString())
                 togglePlugin(context, manifest.id, false)
                 getPrefs(context).edit().remove(PREF_ENABLED_PREFIX + manifest.id).apply()
             }
@@ -691,9 +765,167 @@ object PluginManager {
             val gson = com.google.gson.GsonBuilder().setPrettyPrinting().create()
             manifestFile.writeText(gson.toJson(newManifest))
             scanPlugins(context)
+            EventManager.fireEvent(PluginEvents.ON_PLUGIN_PROPERTY_CHANGED,
+                pluginId, gson.toJson(mapOf("name" to newManifest.name,
+                    "description" to newManifest.description,
+                    "author" to newManifest.author,
+                    "homepage" to (newManifest.homepage ?: ""),
+                    "tags" to newManifest.tags.joinToString(","))))
             true
         } catch (e: Exception) {
             false
         }
+    }
+
+    // ==================== 依赖状态检查 ====================
+
+    /**
+     * 依赖检查结果
+     */
+    data class DependencyStatus(
+        val pluginId: String,
+        val required: Boolean,
+        val exists: Boolean,
+        val isEnabled: Boolean,
+        val installedVersion: String?,
+        val minVersion: String,
+        val versionMatch: Boolean
+    )
+
+    /**
+     * 检查插件的所有依赖状态
+     * @return 每个依赖的详细状态列表
+     */
+    fun checkDependencyStatus(pluginId: String): List<DependencyStatus> {
+        val plugin = loadedPlugins.find { it.manifest.id == pluginId } ?: return emptyList()
+        return plugin.manifest.dependencies.map { dep ->
+            val depPlugin = loadedPlugins.find { it.manifest.id == dep.pluginId }
+            val installedVer = depPlugin?.manifest?.version
+            val exists = depPlugin != null
+            val verMatch = if (installedVer != null) {
+                compareVersions(installedVer, dep.minVersion) >= 0
+            } else false
+            DependencyStatus(
+                pluginId = dep.pluginId,
+                required = dep.required,
+                exists = exists,
+                isEnabled = depPlugin?.enabled?.value ?: false,
+                installedVersion = installedVer,
+                minVersion = dep.minVersion,
+                versionMatch = verMatch
+            )
+        }
+    }
+
+    /**
+     * 获取插件的缺失依赖 ID 列表
+     */
+    fun getMissingDependencies(pluginId: String): List<String> {
+        return checkDependencyStatus(pluginId)
+            .filter { it.required && !it.exists }
+            .map { it.pluginId }
+    }
+
+    /**
+     * 简单版本比较：返回 1 表示 v1 > v2，-1 表示 v1 < v2，0 表示相等
+     */
+    fun compareVersions(v1: String, v2: String): Int {
+        try {
+            val parts1 = v1.split(".").map { it.toIntOrNull() ?: 0 }
+            val parts2 = v2.split(".").map { it.toIntOrNull() ?: 0 }
+            val maxLen = maxOf(parts1.size, parts2.size)
+            for (i in 0 until maxLen) {
+                val p1 = parts1.getOrElse(i) { 0 }
+                val p2 = parts2.getOrElse(i) { 0 }
+                if (p1 != p2) return p1.compareTo(p2)
+            }
+            return 0
+        } catch (e: Exception) {
+            return v1.compareTo(v2)
+        }
+    }
+
+    // ==================== 安装版本比对 ====================
+
+    /**
+     * 安装版本检查结果
+     */
+    data class InstallPreCheck(
+        val alreadyExists: Boolean,
+        val existingVersion: String?,
+        val newVersion: String,
+        val isSameVersion: Boolean,
+        val isUpdate: Boolean,       // 是升级（新 > 旧）
+        val isDowngrade: Boolean     // 是降级（新 < 旧）
+    )
+
+    /**
+     * 安装前版本预检（不执行安装）
+     */
+    fun preCheckInstall(manifest: PluginManifest): InstallPreCheck {
+        val existing = loadedPlugins.find { it.manifest.id == manifest.id }
+        if (existing == null) {
+            return InstallPreCheck(
+                alreadyExists = false, existingVersion = null,
+                newVersion = manifest.version, isSameVersion = false,
+                isUpdate = false, isDowngrade = false
+            )
+        }
+        val cmp = compareVersions(manifest.version, existing.manifest.version)
+        return InstallPreCheck(
+            alreadyExists = true,
+            existingVersion = existing.manifest.version,
+            newVersion = manifest.version,
+            isSameVersion = cmp == 0,
+            isUpdate = cmp > 0,
+            isDowngrade = cmp < 0
+        )
+    }
+
+    // ==================== 属性动态修改 ====================
+
+    /**
+     * 更新插件名称（动态修改，持久化到 manifest.json）
+     */
+    fun updatePluginName(context: Context, pluginId: String, newName: String): Boolean {
+        val manifest = loadedPlugins.find { it.manifest.id == pluginId }?.manifest ?: return false
+        val updated = manifest.copy(name = newName)
+        return updatePluginManifest(context, pluginId, updated)
+    }
+
+    /**
+     * 更新插件描述
+     */
+    fun updatePluginDescription(context: Context, pluginId: String, newDescription: String): Boolean {
+        val manifest = loadedPlugins.find { it.manifest.id == pluginId }?.manifest ?: return false
+        val updated = manifest.copy(description = newDescription)
+        return updatePluginManifest(context, pluginId, updated)
+    }
+
+    /**
+     * 更新插件作者
+     */
+    fun updatePluginAuthor(context: Context, pluginId: String, newAuthor: String): Boolean {
+        val manifest = loadedPlugins.find { it.manifest.id == pluginId }?.manifest ?: return false
+        val updated = manifest.copy(author = newAuthor)
+        return updatePluginManifest(context, pluginId, updated)
+    }
+
+    /**
+     * 更新插件主页
+     */
+    fun updatePluginHomepage(context: Context, pluginId: String, newHomepage: String?): Boolean {
+        val manifest = loadedPlugins.find { it.manifest.id == pluginId }?.manifest ?: return false
+        val updated = manifest.copy(homepage = newHomepage)
+        return updatePluginManifest(context, pluginId, updated)
+    }
+
+    /**
+     * 更新插件标签
+     */
+    fun updatePluginTags(context: Context, pluginId: String, newTags: List<String>): Boolean {
+        val manifest = loadedPlugins.find { it.manifest.id == pluginId }?.manifest ?: return false
+        val updated = manifest.copy(tags = newTags)
+        return updatePluginManifest(context, pluginId, updated)
     }
 }

@@ -50,5 +50,7 @@ data class PluginManifest(
     /** 插件主页/文档链接 */
     val homepage: String? = null,
     /** 插件图标（base64或资源路径） */
-    val icon: String? = null
+    val icon: String? = null,
+    /** 插件标签列表，支持格式: "标签名" / "#颜色:标签名" / "图标路径|标签名" / "#颜色:图标路径|标签名" */
+    val tags: List<String> = emptyList()
 )

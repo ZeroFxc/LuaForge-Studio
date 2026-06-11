@@ -12,6 +12,7 @@ lbcdump
 
 # Editor and IDE
 .vscode/
+luatest/*
 .idea/
 *.swp
 *.swo

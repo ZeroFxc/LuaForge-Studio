@@ -5,11 +5,38 @@ import android.content.Context
 /**
  * 配置存储 API
  * 
- * 使用方式: plugin.config.getInt("key", 0)
+ * 使用方式:
+ *   plugin.config.getString("key", "默认值")
+ *   plugin.config.setString("key", "值")
+ *   plugin.config.getConfig("key", "默认值")   -- Lua 友好别名
+ *   plugin.config.setConfig("key", "值")       -- Lua 友好别名
  */
 class PluginConfig(private val context: Context, private val pluginId: String) {
     
     private val prefsName = "plugin_config_$pluginId"
+
+    /**
+     * 获取字符串配置（Lua 友好别名，调用 getConfig 时通过 LuaJava 路由到此方法）
+     * @param key 配置键
+     * @param defaultValue 默认值
+     * @return 配置值，不存在时返回默认值
+     */
+    fun getConfig(key: String, defaultValue: String): String {
+        return context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+            .getString(key, defaultValue) ?: defaultValue
+    }
+
+    /**
+     * 设置字符串配置（Lua 友好别名）
+     * @param key 配置键
+     * @param value 值
+     */
+    fun setConfig(key: String, value: String) {
+        context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+            .edit()
+            .putString(key, value)
+            .apply()
+    }
     
     fun getString(key: String, defaultValue: String?): String? {
         return context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)

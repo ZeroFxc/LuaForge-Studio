@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes">
+    <title>WebUI 示例插件</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>WebUI 示例插件</h1>
+            <p class="subtitle">HTML + CSS + JS &lrarr; Lua 双向通信</p>
+        </header>
+
+        <!-- 设备信息卡片 -->
+        <section class="card" id="device-card">
+            <h2><span class="tag">NEW</span> 设备信息</h2>
+            <div id="device-info">加载中...</div>
+            <button class="btn btn-outline" onclick="refreshDeviceInfo()">刷新</button>
+        </section>
+
+        <!-- 系统信息卡片 -->
+        <section class="card">
+            <h2><span class="tag">NEW</span> 系统信息</h2>
+            <div class="form-group">
+                <div id="sys-info-result" class="result">点击下方按钮查看系统信息</div>
+            </div>
+            <div class="button-grid">
+                <button class="btn btn-outline" onclick="demoGetBattery()">电池信息</button>
+                <button class="btn btn-outline" onclick="demoGetNetwork()">网络类型</button>
+                <button class="btn btn-outline" onclick="demoGetAppVersion()">应用版本</button>
+                <button class="btn btn-outline" onclick="demoGetTheme()">系统主题</button>
+                <button class="btn btn-outline" onclick="demoOpenUrl()">打开网页</button>
+                <button class="btn btn-outline" onclick="demoShare()">系统分享</button>
+                <button class="btn btn-outline" onclick="demoGetTimestamp()">时间戳</button>
+                <button class="btn btn-outline" onclick="demoGetAllKeys()">存储键列表</button>
+            </div>
+        </section>
+
+        <!-- JS to Lua 调用 -->
+        <section class="card">
+            <h2>JS to Lua 调用 <code>LXC.callLua()</code></h2>
+            <div class="form-group">
+                <label>Echo 测试</label>
+                <div class="input-row">
+                    <input type="text" id="echo-input" placeholder="输入任意内容...">
+                    <button class="btn btn-primary" onclick="doEcho()">发送</button>
+                </div>
+                <div id="echo-result" class="result"></div>
+            </div>
+
+            <div class="form-group">
+                <label>保存配置</label>
+                <div class="input-row">
+                    <input type="text" id="config-key" placeholder="键名">
+                    <input type="text" id="config-value" placeholder="值">
+                    <button class="btn btn-primary" onclick="doSaveConfig()">保存</button>
+                </div>
+                <div id="config-result" class="result"></div>
+            </div>
+
+            <div class="form-group">
+                <label>计数器</label>
+                <div class="input-row">
+                    <span id="counter-display" class="counter">0</span>
+                    <button class="btn btn-primary" onclick="doIncrement()">+1</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Lua to JS 监听 -->
+        <section class="card">
+            <h2>Lua to JS 消息 <code>lxc-message</code></h2>
+            <div class="form-group">
+                <label>最近收到的 Lua 消息</label>
+                <div id="lua-messages" class="message-log"></div>
+            </div>
+            <button class="btn btn-outline" onclick="clearMessages()">清空日志</button>
+        </section>
+
+        <!-- 事件触发 -->
+        <section class="card">
+            <h2>触发 Lua 事件 <code>LXC.fireEvent()</code></h2>
+            <div class="button-grid">
+                <button class="btn btn-accent" onclick="fireLuaEvent('webui:submit')">
+                    触发 submit
+                </button>
+                <button class="btn btn-accent" onclick="fireLuaEvent('webui:reset')">
+                    触发 reset
+                </button>
+            </div>
+        </section>
+
+        <!-- 扩展功能 -->
+        <section class="card">
+            <h2><span class="tag">NEW</span> 扩展功能</h2>
+            <div class="button-grid">
+                <button class="btn btn-outline" onclick="demoGetClipboard()">读取剪贴板</button>
+                <button class="btn btn-outline" onclick="demoSendNotification()">发送通知</button>
+                <button class="btn btn-outline" onclick="demoGetSystemProp()">系统属性</button>
+                <button class="btn btn-outline" onclick="demoExecShell()">执行 Shell</button>
+                <div id="ext-result" class="result" style="grid-column: span 2">点击上方按钮测试扩展 API</div>
+            </div>
+        </section>
+
+        <!-- 系统功能 -->
+        <section class="card">
+            <h2>系统功能</h2>
+            <div class="button-grid">
+                <button class="btn btn-outline" onclick="doToast()">Toast</button>
+                <button class="btn btn-outline" onclick="doLongToast()">长Toast</button>
+                <button class="btn btn-outline" onclick="doCopy('LXC WebUI Demo')">复制</button>
+                <button class="btn btn-outline" onclick="doVibrate()">震动</button>
+                <button class="btn btn-outline" onclick="doSaveData()" style="grid-column: span 2">保存到 SharedPreferences</button>
+                <button class="btn btn-outline" onclick="doLoadData()" style="grid-column: span 2">读取 SharedPreferences</button>
+                <div id="storage-result" class="result" style="grid-column: span 2"></div>
+            </div>
+        </section>
+
+        <!-- 底部 -->
+        <footer class="footer">
+            <button class="btn btn-danger" onclick="LXC.navigateBack()">返回</button>
+            <span class="version">LXC WebUI Demo v2.0</span>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

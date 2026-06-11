@@ -116,6 +116,8 @@ fun CodeEditScreen(
 
     var showInstallDialog by remember { mutableStateOf(false) }
     var apkFilePath by remember { mutableStateOf<String?>(null) }
+    var buildResultType by remember { mutableStateOf(BuildResultType.SUCCESS) }
+    var buildResultMessage by remember { mutableStateOf<String?>(null) }
     var isBuilding by remember { mutableStateOf(false) }
     var isCompilingFile by remember { mutableStateOf(false) }
     var showInitialLoader by remember { mutableStateOf(true) }
@@ -332,11 +334,24 @@ fun CodeEditScreen(
                 LogCatcher.e("CodeEditScreen", "构建协程异常", e)
                 "error: ${context.getString(R.string.code_editor_build_exception, e.message)}"
             }
-            if (result.startsWith("error:")) {
-                toast.showToast(context.getString(R.string.code_editor_build_failed, result.substringAfter("error: ")))
-            } else {
-                apkFilePath = result
-                showInstallDialog = true
+            when {
+                result.startsWith("cancelled:") -> {
+                    // 构建被取消（插件回调 cancelBuild 或被用户取消）
+                    buildResultType = BuildResultType.CANCELLED
+                    buildResultMessage = result.substringAfter("cancelled:")
+                    showInstallDialog = true
+                }
+                result.startsWith("error:") -> {
+                    buildResultType = BuildResultType.ERROR
+                    buildResultMessage = result.substringAfter("error: ")
+                    showInstallDialog = true
+                }
+                else -> {
+                    buildResultType = BuildResultType.SUCCESS
+                    apkFilePath = result
+                    buildResultMessage = result
+                    showInstallDialog = true
+                }
             }
             isBuilding = false
         }
@@ -693,12 +708,14 @@ fun CodeEditScreen(
                                 }
                             )
 
-                            InstallApkDialog(
-                                showInstallDialog = showInstallDialog,
-                                apkFilePath = apkFilePath,
+                            BuildResultDialog(
+                                showDialog = showInstallDialog,
+                                resultType = buildResultType,
+                                resultMessage = buildResultMessage,
                                 onDismiss = {
                                     showInstallDialog = false
                                     apkFilePath = null
+                                    buildResultMessage = null
                                 },
                                 onInstall = {
                                     apkFilePath?.let { filePath ->
@@ -706,6 +723,7 @@ fun CodeEditScreen(
                                     }
                                     showInstallDialog = false
                                     apkFilePath = null
+                                    buildResultMessage = null
                                 }
                             )
 

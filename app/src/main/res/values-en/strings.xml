@@ -392,9 +392,17 @@
     <string name="code_editor_close_all">Close All</string>
     <string name="code_editor_bottom_area_content">Bottom area content</string>
     <string name="code_editor_build_success">Build Successful</string>
+    <string name="code_editor_build_cancelled">Build Cancelled</string>
     <string name="code_editor_apk_built">APK built successfully!</string>
     <string name="code_editor_apk_path">%s</string>
     <string name="code_editor_install_prompt">Install this APK now?</string>
+    <string name="build_cancelled_message">This build has been cancelled. The project was not modified.</string>
+    <string name="build_error_message">An error occurred during the build:</string>
+    <string name="editor_build_failed_title">Build Failed</string>
+    <string name="webui_load_error">Page load failed</string>
+    <string name="webui_retry">Retry</string>
+    <string name="webui_unknown_error">Unknown error</string>
+    <string name="refresh">Refresh</string>
     <string name="code_editor_install">Install</string>
     <string name="code_editor_compile_success">Compilation successful! Compiled file: %s</string>
     <string name="code_editor_compile_failed">Compilation failed: %s</string>
@@ -695,4 +703,54 @@
     <string name="plugin_dependency_version_mismatch">Dependency %1$s requires version %2$s, current version %3$s</string>
     <string name="plugin_dependency_disabled">Required dependency %s is not enabled</string>
     <string name="plugin_dependency_check_passed">Dependency check passed</string>
+
+    <!-- Plugin Management UI - Main Page -->
+    <string name="plugin_management_title">Plugin Management</string>
+    <string name="plugin_tab_all">All</string>
+    <string name="plugin_tab_core">Core</string>
+    <string name="plugin_tab_normal">Normal</string>
+    <string name="plugin_tab_extension">Extension</string>
+    <string name="plugin_tab_dependent">Dependent</string>
+    <string name="plugin_tab_disabled">Disabled</string>
+    <string name="plugin_stats_total">Total</string>
+    <string name="plugin_stats_enabled">Enabled</string>
+    <string name="plugin_stats_core">Core</string>
+    <string name="plugin_stats_disabled">Disabled</string>
+    <string name="plugin_import_button">Import Plugin</string>
+    <string name="plugin_uninstall_title">Uninstall Plugin</string>
+    <string name="plugin_uninstall_confirm">Are you sure you want to uninstall "%s"?</string>
+    <string name="plugin_uninstall_warning">This will delete the plugin directory and all data, including logs and configuration.</string>
+    <string name="plugin_uninstall_enabled_hint">This plugin is currently enabled. It will be disabled before uninstalling.</string>
+    <string name="plugin_uninstall_btn">Uninstall</string>
+    <string name="plugin_context_menu_title">Actions: %s</string>
+    <string name="plugin_open_webui">Open Web UI</string>
+    <string name="plugin_reload">Reload Plugin</string>
+    <string name="plugin_export">Export Plugin</string>
+    <string name="plugin_card_webui_button">Web UI</string>
+    <string name="plugin_card_reload_button">Reload</string>
+    <string name="plugin_card_uninstall_button">Uninstall</string>
+    <string name="plugin_info_id">ID</string>
+    <string name="plugin_info_type">Type</string>
+    <string name="plugin_info_entry">Entry</string>
+    <string name="plugin_info_api_version">API Version</string>
+    <string name="plugin_info_homepage">Homepage</string>
+    <string name="plugin_deps_title">Dependencies (%d):</string>
+    <string name="plugin_deps_required">(Required)</string>
+    <string name="plugin_deps_optional">(Optional)</string>
+    <string name="plugin_dependents_title">Depended by (%d):</string>
+    <string name="plugin_tags_title">Tags (%d):</string>
+    <string name="plugin_no_webui">No Web UI provided\n(missing web/%s)</string>
+
+    <!-- Install version check -->
+    <string name="plugin_install_exists_title">Plugin Exists</string>
+    <string name="plugin_install_exists_msg">Installed version: %1$s\nNew version: %2$s\n\nReplace existing version?</string>
+    <string name="plugin_install_same_version">Same version (%s), reinstall?</string>
+    <string name="plugin_install_downgrade">Current version (%1$s) is higher than install version (%2$s), downgrade?</string>
+
+    <!-- Dependency check -->
+    <string name="plugin_dep_missing_title">Missing Dependencies</string>
+    <string name="plugin_dep_missing_msg">Plugin \"%1$s\" requires the following dependencies:\n%2$s\n\nEnable anyway?</string>
+    <string name="plugin_dep_version_low">Version mismatch: %1$s (need &gt;= %2$s, current %3$s)</string>
+    <string name="plugin_dep_not_found">Not found: %1$s</string>
+    <string name="plugin_dep_disabled">Disabled: %1$s</string>
 </resources>

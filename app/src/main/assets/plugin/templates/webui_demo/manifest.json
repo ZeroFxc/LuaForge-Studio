@@ -1,0 +1,24 @@
+{
+  "id": "com.example.webui_demo",
+  "name": "WebUI 示例插件",
+  "version": "1.0.0",
+  "description": "演示 plugin.webui API：HTML/CSS/JS 自定义界面 + LXC 桥接双向通信（Lua ↔ JS）",
+  "author": "DifierLine",
+  "type": "lua",
+  "pluginType": "normal",
+  "main": "main.lua",
+  "apiVersion": 1,
+  "category": "demo",
+  "homepage": null,
+  "icon": null,
+  "dependencies": [],
+  "extendedBy": [],
+  "tags": [
+    "webui",
+    "#2196F3:html5",
+    "#4CAF50:javascript",
+    "#FF9800:demo",
+    "双向通信",
+    "LXC API"
+  ]
+}

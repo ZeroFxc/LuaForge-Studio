@@ -39,6 +39,9 @@ import com.luaforge.studio.lxclua.plugin.PluginManager
 import com.luaforge.studio.lxclua.R
 import com.luaforge.studio.lxclua.plugin.LoadedPlugin
 import com.luaforge.studio.lxclua.plugin.data.PluginManifest
+import com.luaforge.studio.lxclua.plugin.data.PluginDependency
+import com.luaforge.studio.lxclua.plugin.state.EventManager
+import com.luaforge.studio.lxclua.plugin.state.PluginEvents
 import com.luaforge.studio.lxclua.plugin.state.PluginDetailState
 import com.luaforge.studio.lxclua.plugin.state.PluginDetailItem
 import kotlinx.coroutines.Dispatchers
@@ -266,7 +269,7 @@ fun PluginScreen(
                         }
                     }
                 }
-                items(plugins, key = { "${it.manifest.id}_${it.enabled}" }) { plugin ->
+                items(plugins, key = { it.manifest.id }) { plugin ->
                     PluginItemCard(
                         plugin = plugin,
                         onToggle = { enabled ->
@@ -293,6 +296,17 @@ fun PluginScreen(
                         },
                         onLog = {
                             logPlugin = plugin
+                        },
+                        onCardClick = {
+                            // 触发插件卡片点击事件，供插件注册的监听器响应
+                            EventManager.fireEvent(PluginEvents.ON_PLUGIN_CARD_CLICK, plugin.manifest.id)
+                            // 如果插件包含 WebUI，点击卡片后自动打开
+                            val hasWeb = java.io.File(plugin.directory, "web/index.html").exists()
+                            if (hasWeb) {
+                                com.luaforge.studio.lxclua.plugin.state.NavigationState.openWebUI(
+                                    plugin.manifest.id, "index.html"
+                                )
+                            }
                         }
                     )
                 }
@@ -492,16 +506,41 @@ fun PluginItemCard(
     onEdit: () -> Unit,
     onExportZip: () -> Unit,
     onExportDir: () -> Unit,
-    onLog: () -> Unit
+    onLog: () -> Unit,
+    onCardClick: () -> Unit = {}
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
+
+    // 缓存昂贵的计算结果，避免列表滑动时重复计算
+    val description = remember(plugin.manifest.description) { plugin.manifest.description ?: "" }
+    val dependencies = remember(plugin.manifest.dependencies) { plugin.manifest.dependencies ?: emptyList() }
+    val extensions = remember(plugin.manifest.extendedBy) { plugin.manifest.extendedBy ?: emptyList() }
+    val hasWebUI = remember { java.io.File(plugin.directory, "web/index.html").exists() }
+
+    // 缓存依赖/扩展插件的名称查找，避免在重组时重复遍历 loadedPlugins
+    // 这些名称在插件生命周期内不变，可以安全缓存
+    val depNameMap = remember(plugin.manifest.id, dependencies) {
+        dependencies.associate { dep ->
+            dep.pluginId to (PluginManager.loadedPlugins.find { it.manifest.id == dep.pluginId }?.manifest?.name ?: dep.pluginId)
+        }
+    }
+    val extNameMap = remember(plugin.manifest.id, extensions) {
+        extensions.associate { extId ->
+            extId to (PluginManager.loadedPlugins.find { it.manifest.id == extId }?.manifest?.name ?: extId)
+        }
+    }
+
+    // 缓存自定义详情项，避免每次重组都查询
+    val detailItems = remember(plugin.manifest.id) {
+        PluginDetailState.getItemsForPlugin(plugin.manifest.id)
+    }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = {},
+                onClick = onCardClick,
                 onLongClick = { showContextMenu = true }
             ),
         shape = RoundedCornerShape(12.dp),
@@ -513,52 +552,15 @@ fun PluginItemCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = plugin.manifest.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = stringResource(R.string.plugin_version_author, plugin.manifest.version, plugin.manifest.author),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
+            // 卡片头部：名称、版本/作者 + Switch/日志/删除按钮
+            PluginCardHeader(
+                plugin = plugin,
+                onToggle = onToggle,
+                onLog = onLog,
+                onDelete = onDelete
+            )
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Switch(
-                        checked = plugin.enabled,
-                        onCheckedChange = onToggle
-                    )
-                    IconButton(onClick = onLog) {
-                        Icon(
-                            imageVector = Icons.Default.Article,
-                            contentDescription = stringResource(R.string.plugin_cd_view_log),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.plugin_cd_delete),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-
-            // 展开/折叠指示器（始终显示，因为展开区有类型标签和ID）
+            // 展开/折叠指示器
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -570,214 +572,35 @@ fun PluginItemCard(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                    Text(
-                        text = if (expanded) stringResource(R.string.plugin_expand_collapse) else stringResource(R.string.plugin_expand_detail),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (expanded) stringResource(R.string.plugin_expand_collapse) else stringResource(R.string.plugin_expand_cd),
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+                Text(
+                    text = if (expanded) stringResource(R.string.plugin_expand_collapse) else stringResource(R.string.plugin_expand_detail),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (expanded) stringResource(R.string.plugin_expand_collapse) else stringResource(R.string.plugin_expand_cd),
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
 
+            // 展开内容：延迟组合，仅在展开时渲染
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically(),
                 exit = shrinkVertically()
             ) {
-                Column {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val type = plugin.manifest.type ?: "lua"
-                        val typeText = type.uppercase()
-                        val badgeColor = when (type.lowercase()) {
-                            "lua" -> MaterialTheme.colorScheme.primaryContainer
-                            else -> MaterialTheme.colorScheme.secondaryContainer
-                        }
-                        val badgeTextColor = when (type.lowercase()) {
-                            "lua" -> MaterialTheme.colorScheme.onPrimaryContainer
-                            else -> MaterialTheme.colorScheme.onSecondaryContainer
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(badgeColor)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = typeText,
-                                fontSize = 10.sp,
-                                color = badgeTextColor,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        val pluginType = plugin.manifest.pluginType ?: "normal"
-                        val pluginTypeText = when (pluginType.lowercase()) {
-                            "core" -> stringResource(R.string.plugin_category_core)
-                            "normal" -> stringResource(R.string.plugin_category_normal)
-                            "dependent" -> stringResource(R.string.plugin_category_dependent)
-                            "extension" -> stringResource(R.string.plugin_category_extension)
-                            else -> pluginType
-                        }
-                        val pluginTypeBadgeColor = when (pluginType.lowercase()) {
-                            "core" -> MaterialTheme.colorScheme.errorContainer
-                            "normal" -> MaterialTheme.colorScheme.tertiaryContainer
-                            "dependent" -> MaterialTheme.colorScheme.secondaryContainer
-                            "extension" -> MaterialTheme.colorScheme.primaryContainer
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        }
-                        val pluginTypeTextColor = when (pluginType.lowercase()) {
-                            "core" -> MaterialTheme.colorScheme.onErrorContainer
-                            "normal" -> MaterialTheme.colorScheme.onTertiaryContainer
-                            "dependent" -> MaterialTheme.colorScheme.onSecondaryContainer
-                            "extension" -> MaterialTheme.colorScheme.onPrimaryContainer
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(pluginTypeBadgeColor)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = pluginTypeText,
-                                fontSize = 10.sp,
-                                color = pluginTypeTextColor,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        
-                        Text(
-                            text = stringResource(R.string.plugin_id_label, plugin.manifest.id),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    val description = plugin.manifest.description ?: ""
-                        if (description.isNotEmpty()) {
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    val dependencies = plugin.manifest.dependencies ?: emptyList()
-                    val extensions = plugin.manifest.extendedBy ?: emptyList()
-                    val hasDependencies = dependencies.isNotEmpty()
-                    val hasExtensions = extensions.isNotEmpty()
-
-                    if (hasDependencies || hasExtensions) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        if (hasDependencies) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Link,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = stringResource(R.string.plugin_dependencies_label),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                dependencies.forEachIndexed { index, dep ->
-                                    val depPluginName = PluginManager.loadedPlugins
-                                        .find { it.manifest.id == dep.pluginId }?.manifest?.name ?: dep.pluginId
-                                    val isSatisfied = PluginManager.loadedPlugins.any {
-                                        it.manifest.id == dep.pluginId && it.enabled
-                                    }
-                                    Text(
-                                        text = depPluginName + if (index < dependencies.size - 1) ", " else "",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isSatisfied)
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        else
-                                            MaterialTheme.colorScheme.error,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-
-                        if (hasExtensions) {
-                            if (hasDependencies) Spacer(modifier = Modifier.height(2.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Extension,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.secondary
-                                )
-                                Text(
-                                    text = stringResource(R.string.plugin_extended_by_label),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                                extensions.forEachIndexed { index, extId ->
-                                    val extPluginName = PluginManager.loadedPlugins
-                                        .find { it.manifest.id == extId }?.manifest?.name ?: extId
-                                    val isLoaded = PluginManager.loadedPlugins.any { it.manifest.id == extId }
-                                    Text(
-                                        text = extPluginName + if (index < extensions.size - 1) ", " else "",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isLoaded)
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        else
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // 插件自定义详情扩展（开关/齿轮按钮）
-                    val detailItems = PluginDetailState.getItemsForPlugin(plugin.manifest.id)
-                    if (detailItems.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = stringResource(R.string.plugin_detail_extensions),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-
-                        detailItems.forEach { item ->
-                            key(item.key) {
-                                PluginDetailItemRow(item = item)
-                            }
-                        }
-                    }
-                }
+                PluginCardExpandedContent(
+                    plugin = plugin,
+                    description = description,
+                    dependencies = dependencies,
+                    extensions = extensions,
+                    depNameMap = depNameMap,
+                    extNameMap = extNameMap,
+                    detailItems = detailItems,
+                    hasWebUI = hasWebUI
+                )
             }
 
             // 长按上下文菜单
@@ -830,6 +653,292 @@ fun PluginItemCard(
                         )
                     }
                 )
+            }
+        }
+    }
+}
+
+/**
+ * 卡片头部组件：插件名称、版本/作者 + Switch/日志/删除按钮
+ * 提取为独立 Composable 减少重组范围
+ */
+@Composable
+private fun PluginCardHeader(
+    plugin: LoadedPlugin,
+    onToggle: (Boolean) -> Unit,
+    onLog: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = plugin.manifest.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = stringResource(R.string.plugin_version_author, plugin.manifest.version, plugin.manifest.author),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Switch(
+                checked = plugin.enabled.value,
+                onCheckedChange = onToggle
+            )
+            IconButton(onClick = onLog) {
+                Icon(
+                    imageVector = Icons.Default.Article,
+                    contentDescription = stringResource(R.string.plugin_cd_view_log),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.plugin_cd_delete),
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 卡片展开内容组件：类型标签、描述、依赖、扩展、自定义详情、WebUI 按钮
+ * 仅在卡片展开时组合，减少折叠状态下的重组开销
+ */
+@Composable
+private fun PluginCardExpandedContent(
+    plugin: LoadedPlugin,
+    description: String,
+    dependencies: List<PluginDependency>,
+    extensions: List<String>,
+    depNameMap: Map<String, String>,
+    extNameMap: Map<String, String>,
+    detailItems: List<PluginDetailItem>,
+    hasWebUI: Boolean
+) {
+    Column {
+        // 类型标签行
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 脚本类型标签（LUA/DEX/APK）
+            val type = plugin.manifest.type ?: "lua"
+            val typeText = type.uppercase()
+            val badgeColor = when (type.lowercase()) {
+                "lua" -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.secondaryContainer
+            }
+            val badgeTextColor = when (type.lowercase()) {
+                "lua" -> MaterialTheme.colorScheme.onPrimaryContainer
+                else -> MaterialTheme.colorScheme.onSecondaryContainer
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(badgeColor)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = typeText,
+                    fontSize = 10.sp,
+                    color = badgeTextColor,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // 插件分类标签（核心/普通/依赖/扩展）
+            val pluginType = plugin.manifest.pluginType ?: "normal"
+            val pluginTypeText = when (pluginType.lowercase()) {
+                "core" -> stringResource(R.string.plugin_category_core)
+                "normal" -> stringResource(R.string.plugin_category_normal)
+                "dependent" -> stringResource(R.string.plugin_category_dependent)
+                "extension" -> stringResource(R.string.plugin_category_extension)
+                else -> pluginType
+            }
+            val pluginTypeBadgeColor = when (pluginType.lowercase()) {
+                "core" -> MaterialTheme.colorScheme.errorContainer
+                "normal" -> MaterialTheme.colorScheme.tertiaryContainer
+                "dependent" -> MaterialTheme.colorScheme.secondaryContainer
+                "extension" -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            }
+            val pluginTypeTextColor = when (pluginType.lowercase()) {
+                "core" -> MaterialTheme.colorScheme.onErrorContainer
+                "normal" -> MaterialTheme.colorScheme.onTertiaryContainer
+                "dependent" -> MaterialTheme.colorScheme.onSecondaryContainer
+                "extension" -> MaterialTheme.colorScheme.onPrimaryContainer
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(pluginTypeBadgeColor)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = pluginTypeText,
+                    fontSize = 10.sp,
+                    color = pluginTypeTextColor,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Text(
+                text = stringResource(R.string.plugin_id_label, plugin.manifest.id),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // 描述
+        if (description.isNotEmpty()) {
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        val hasDependencies = dependencies.isNotEmpty()
+        val hasExtensions = extensions.isNotEmpty()
+
+        // 依赖和扩展信息
+        if (hasDependencies || hasExtensions) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(4.dp))
+
+            if (hasDependencies) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Link,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = stringResource(R.string.plugin_dependencies_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    dependencies.forEachIndexed { index, dep ->
+                        val depName = depNameMap[dep.pluginId] ?: dep.pluginId
+                        val isSatisfied = PluginManager.loadedPlugins.any {
+                            it.manifest.id == dep.pluginId && it.enabled.value
+                        }
+                        Text(
+                            text = depName + if (index < dependencies.size - 1) ", " else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isSatisfied)
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else
+                                MaterialTheme.colorScheme.error,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            if (hasExtensions) {
+                if (hasDependencies) Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Extension,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        text = stringResource(R.string.plugin_extended_by_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    extensions.forEachIndexed { index, extId ->
+                        val extName = extNameMap[extId] ?: extId
+                        val isLoaded = PluginManager.loadedPlugins.any { it.manifest.id == extId }
+                        Text(
+                            text = extName + if (index < extensions.size - 1) ", " else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isLoaded)
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+
+        // 插件自定义详情扩展（开关/齿轮按钮）
+        if (detailItems.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = stringResource(R.string.plugin_detail_extensions),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            detailItems.forEach { item ->
+                key(item.key) {
+                    PluginDetailItemRow(item = item)
+                }
+            }
+        }
+
+        // WebUI 按钮（如果插件提供了 web 目录）
+        if (hasWebUI) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedButton(
+                onClick = {
+                    com.luaforge.studio.lxclua.plugin.state.NavigationState.openWebUI(
+                        plugin.manifest.id, "index.html"
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.WebAsset,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(stringResource(R.string.plugin_card_webui_button))
             }
         }
     }

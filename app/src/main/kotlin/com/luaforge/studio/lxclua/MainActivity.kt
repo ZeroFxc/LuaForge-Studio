@@ -145,6 +145,34 @@ fun MainApp() {
 
     var currentScreen by remember { mutableStateOf(AppScreen.MAIN) }
     var selectedProject by remember { mutableStateOf<ProjectItem?>(null) }
+
+    // 监听插件导航请求
+    val navTarget by com.luaforge.studio.lxclua.plugin.state.NavigationState.pendingNavTarget
+    LaunchedEffect(navTarget) {
+        navTarget?.let { target ->
+            when (target) {
+                "main" -> currentScreen = AppScreen.MAIN
+                "new_project" -> currentScreen = AppScreen.NEW_PROJECT
+                "editor" -> currentScreen = AppScreen.EDITOR
+            }
+            com.luaforge.studio.lxclua.plugin.state.NavigationState.clearNavTarget()
+        }
+    }
+
+    // WebUI 状态（在 MainApp 顶层作用域，覆盖所有页面包括编辑器）
+    var webUIPluginId by remember { mutableStateOf<String?>(null) }
+    var webUIPage by remember { mutableStateOf("index.html") }
+
+    // 监听 WebUI 导航请求
+    val webUINavPluginId by com.luaforge.studio.lxclua.plugin.state.NavigationState.pendingWebUIPluginId
+    LaunchedEffect(webUINavPluginId) {
+        webUINavPluginId?.let { id ->
+            webUIPluginId = id
+            webUIPage = com.luaforge.studio.lxclua.plugin.state.NavigationState.pendingWebUIPage.value
+                ?: "index.html"
+        }
+    }
+
     var projectItems by remember { mutableStateOf(emptyList<ProjectItem>()) }
     val toast = rememberNonBlockingToastState()
     val scope = rememberCoroutineScope()
@@ -267,6 +295,20 @@ fun MainApp() {
             hostState = toast.originalToastState,
             transitionSpec = toastTransitionSpec,
             toast = { toastData -> Toast(toastData) }
+        )
+    }
+
+    // WebUI 全屏覆盖层（MainApp 顶层，覆盖所有页面包括编辑器）
+    if (webUIPluginId != null) {
+        val id = webUIPluginId!!
+        com.luaforge.studio.lxclua.plugin.ui.PluginWebUIScreen(
+            pluginId = id,
+            page = webUIPage,
+            onBack = {
+                webUIPluginId = null
+                webUIPage = "index.html"
+                com.luaforge.studio.lxclua.plugin.state.NavigationState.onWebUIClosed()
+            }
         )
     }
 }
@@ -2047,6 +2089,11 @@ class MainActivity : ComponentActivity() {
     com.luaforge.studio.lxclua.plugin.PluginManager.init(this)
     com.luaforge.studio.lxclua.plugin.PluginManager.currentActivity = this
 
+    // 触发应用启动事件
+    com.luaforge.studio.lxclua.plugin.state.EventManager.fireEvent(
+        com.luaforge.studio.lxclua.plugin.state.PluginEvents.ON_APP_START
+    )
+
     enableEdgeToEdge()
     WindowCompat.setDecorFitsSystemWindows(window, false)
 
@@ -2119,15 +2166,24 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         com.luaforge.studio.lxclua.plugin.PluginManager.currentActivity = this
+        com.luaforge.studio.lxclua.plugin.state.EventManager.fireEvent(
+            com.luaforge.studio.lxclua.plugin.state.PluginEvents.ON_APP_RESUME
+        )
     }
     
     override fun onPause() {
         super.onPause()
+        com.luaforge.studio.lxclua.plugin.state.EventManager.fireEvent(
+            com.luaforge.studio.lxclua.plugin.state.PluginEvents.ON_APP_PAUSE
+        )
         com.luaforge.studio.lxclua.plugin.PluginManager.currentActivity = null
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        com.luaforge.studio.lxclua.plugin.state.EventManager.fireEvent(
+            com.luaforge.studio.lxclua.plugin.state.PluginEvents.ON_APP_STOP
+        )
         com.luaforge.studio.lxclua.plugin.PluginManager.currentActivity = null
         com.luaforge.studio.lxclua.ui.editor.viewmodel.CompletionDataManager.clear()
         System.gc()

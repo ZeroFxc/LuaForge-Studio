@@ -1639,7 +1639,7 @@ struct ffi_module {
 #endif
     }
 
-    __attribute__((used, visibility("hidden"), const))
+    __attribute__((used, visibility("hidden")))
     static void FIND__LOCATE__LIBNAME__() {}
 
     static void setup(lua_State *L) {

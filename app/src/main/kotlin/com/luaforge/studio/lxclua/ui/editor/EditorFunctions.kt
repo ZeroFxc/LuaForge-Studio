@@ -14,6 +14,8 @@ import com.luaforge.studio.lxclua.utils.ConsoleUtil
 import com.luaforge.studio.lxclua.utils.JsonUtil
 import com.luaforge.studio.lxclua.utils.LogCatcher
 import com.luaforge.studio.lxclua.utils.NonBlockingToastState
+import com.luaforge.studio.lxclua.plugin.state.EventManager
+import com.luaforge.studio.lxclua.plugin.state.PluginEvents
 import com.luajava.LuaState
 import com.luajava.LuaStateFactory
 import kotlinx.coroutines.CoroutineScope
@@ -60,6 +62,16 @@ suspend fun compileCurrentFile(
     // 显示编译进度
     isCompilingFile(true)
 
+    // 触发构建开始钩子
+    EventManager.fireEvent(PluginEvents.ON_BUILD_START, filePath, "compile")
+
+    // 检查取消标志（插件可能在 onBuildStart 中调用了 cancelBuild）
+    if (com.luaforge.studio.lxclua.plugin.bridge.PluginBuild.buildCancelled) {
+        com.luaforge.studio.lxclua.plugin.bridge.PluginBuild.buildCancelled = false
+        isCompilingFile(false)
+        return
+    }
+
     try {
         // 在后台线程执行编译
         val (compiledPath, errorMsg) = withContext(Dispatchers.IO) {
@@ -96,7 +108,9 @@ suspend fun compileCurrentFile(
         }
 
         if (compiledPath != null) {
-            // 显示成功消息
+            // 触发编译完成钩子（成功）
+            EventManager.fireEvent(PluginEvents.ON_BUILD_FINISH, filePath, compiledPath, true)
+            com.luaforge.studio.lxclua.plugin.bridge.PluginBuild.lastGlobalResult = compiledPath
             toast.showToast(context.getString(R.string.code_editor_compile_success, compiledPath))
 
             // 重新加载编译后的文件
@@ -113,13 +127,20 @@ suspend fun compileCurrentFile(
                 viewModel.reloadCurrentFile()
             }
         } else {
-            // 显示具体的错误信息
+            // 触发编译完成钩子（失败）
             val displayError = errorMsg ?: context.getString(R.string.unknown_error)
+            EventManager.fireEvent(PluginEvents.ON_BUILD_FINISH, filePath, displayError, false)
+            com.luaforge.studio.lxclua.plugin.bridge.PluginBuild.lastGlobalResult = displayError
+            EventManager.fireEvent(PluginEvents.ON_BUILD_ERROR, filePath, displayError, "compile")
             toast.showToast(context.getString(R.string.code_editor_compile_failed, displayError))
         }
     } catch (e: Exception) {
         LogCatcher.e("CodeEditScreen", "编译文件异常", e)
-        toast.showToast(context.getString(R.string.code_editor_compile_exception, e.message))
+        val excMsg = context.getString(R.string.code_editor_compile_exception, e.message)
+        EventManager.fireEvent(PluginEvents.ON_BUILD_FINISH, filePath, excMsg, false)
+        com.luaforge.studio.lxclua.plugin.bridge.PluginBuild.lastGlobalResult = excMsg
+        EventManager.fireEvent(PluginEvents.ON_BUILD_ERROR, filePath, excMsg, "compile")
+        toast.showToast(excMsg)
     } finally {
         // 隐藏编译进度
         isCompilingFile(false)
@@ -132,6 +153,15 @@ suspend fun compileCurrentFile(
 suspend fun buildProject(context: Context, projectPath: String): String =
     withContext(Dispatchers.IO) {
         LogCatcher.i("CodeEditScreen", "开始构建项目，路径: $projectPath")
+
+        // 触发构建开始钩子
+        EventManager.fireEvent(PluginEvents.ON_BUILD_START, projectPath, "project")
+
+        // 检查取消标志（插件可能在 onBuildStart 中调用了 cancelBuild）
+        if (com.luaforge.studio.lxclua.plugin.bridge.PluginBuild.buildCancelled) {
+            com.luaforge.studio.lxclua.plugin.bridge.PluginBuild.buildCancelled = false
+            return@withContext "cancelled:已取消"
+        }
 
         // 在构建前清理内存
         System.gc()
@@ -290,20 +320,32 @@ val mavenDependencies = try {
             val finalUsedMemory = runtime.totalMemory() - runtime.freeMemory()
             LogCatcher.i("CodeEditScreen", "构建后内存 - 已用: ${finalUsedMemory / 1024 / 1024}MB")
 
+            // 触发构建完成钩子
+            val success = !result.startsWith("error:")
+            EventManager.fireEvent(PluginEvents.ON_BUILD_FINISH, projectPath, result, success)
+            com.luaforge.studio.lxclua.plugin.bridge.PluginBuild.lastGlobalResult = result
+            if (!success) {
+                EventManager.fireEvent(PluginEvents.ON_BUILD_ERROR, projectPath, result, "project")
+            }
             result
         } catch (e: Throwable) {
+            val errorResult: String
             if (e is OutOfMemoryError) {
                 LogCatcher.e(
                     "CodeEditScreen",
                     "构建过程中内存溢出",
                     Exception("内存溢出: ${e.message}")
                 )
-                "error: ${context.getString(R.string.editor_build_out_of_memory)}"
+                errorResult = "error: ${context.getString(R.string.editor_build_out_of_memory)}"
             } else {
                 val exception = if (e is Exception) e else Exception(e.toString(), null)
                 LogCatcher.e("CodeEditScreen", "调用 ApkBuilder 构建失败", exception)
-                "error: ${context.getString(R.string.code_editor_build_exception, e.message)}"
+                errorResult = "error: ${context.getString(R.string.code_editor_build_exception, e.message)}"
             }
+            EventManager.fireEvent(PluginEvents.ON_BUILD_FINISH, projectPath, errorResult, false)
+            com.luaforge.studio.lxclua.plugin.bridge.PluginBuild.lastGlobalResult = errorResult
+            EventManager.fireEvent(PluginEvents.ON_BUILD_ERROR, projectPath, errorResult, "project")
+            errorResult
         }
     }
 

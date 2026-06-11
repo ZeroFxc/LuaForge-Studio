@@ -37,6 +37,30 @@ object PluginEvents {
     
     // UI 交互事件
     const val ON_BACK_PRESSED = "onBackPressed"
+
+    // 构建事件
+    /** 构建开始，参数: (projectPath: String, buildType: String) buildType 为 "project" 或 "compile" */
+    const val ON_BUILD_START = "onBuildStart"
+    /** 构建完成，参数: (projectPath: String, result: String, success: Boolean) */
+    const val ON_BUILD_FINISH = "onBuildFinish"
+    /** 构建出错，参数: (projectPath: String, errorMessage: String, buildType: String) */
+    const val ON_BUILD_ERROR = "onBuildError"
+
+    // 依赖事件
+    /** 依赖缺失，启用插件时必需依赖不满足，参数: (pluginId: String, missingDepsCsv: String) */
+    const val ON_DEPENDENCY_MISSING = "onDependencyMissing"
+
+    // 属性变更事件
+    /** 插件属性变更，updatePluginName/Description 等成功后，参数: (pluginId: String, changedFieldsJson: String) */
+    const val ON_PLUGIN_PROPERTY_CHANGED = "onPluginPropertyChanged"
+
+    // 安装事件
+    /** 安装版本冲突，参数: (pluginId, existingVersion, newVersion, isUpdate, isDowngrade) */
+    const val ON_INSTALL_VERSION_CONFLICT = "onInstallVersionConflict"
+
+    // 插件卡片交互事件
+    /** 插件管理页面中卡片被单击，参数: (pluginId: String) */
+    const val ON_PLUGIN_CARD_CLICK = "onPluginCardClick"
 }
 
 /**

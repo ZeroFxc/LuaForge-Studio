@@ -35,10 +35,15 @@ object LuaPluginLoader {
         val L = LuaStateFactory.newLuaState()
         L.openLibs()
         
-        // 2. 创建 PluginBridge 对象（分类化 API）
+        // 2. 注入全局工具对象
         val bridge = PluginBridge(context, plugin.manifest.id)
         L.pushJavaObject(bridge)
         L.setGlobal("plugin")
+
+        // 注入 json 全局对象（基于 org.json.JSONObject，Lua 通过 obj:optString("key","") 访问字段）
+        val jsonHelper = com.luaforge.studio.lxclua.plugin.bridge.LuaJsonHelper()
+        L.pushJavaObject(jsonHelper)
+        L.setGlobal("json")
         
         // 3. 执行主入口脚本
         val mainFile = File(plugin.directory, plugin.manifest.main)

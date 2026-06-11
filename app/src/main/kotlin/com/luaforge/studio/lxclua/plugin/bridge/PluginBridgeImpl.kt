@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.webkit.WebView
 import com.luaforge.studio.lxclua.plugin.PluginManager
 import com.luaforge.studio.lxclua.plugin.api.IPluginBridge
 import com.luaforge.studio.lxclua.plugin.api.callbacks.*
@@ -12,6 +13,7 @@ import com.luaforge.studio.lxclua.plugin.data.FileInfo
 import com.luaforge.studio.lxclua.plugin.data.RegisteredResource
 import com.luaforge.studio.lxclua.plugin.data.ShortcutInfo
 import com.luaforge.studio.lxclua.plugin.state.EventManager
+import com.luaforge.studio.lxclua.plugin.state.NavigationState
 import com.luaforge.studio.lxclua.plugin.state.UIState
 import com.luaforge.studio.lxclua.ui.editor.QuickAction
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +67,14 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
     
     private val decorationBridge by lazy {
         PluginDecoration(pluginId)
+    }
+
+    private val buildBridge by lazy {
+        PluginBuild(PluginManager.appContext!!)
+    }
+
+    private val webUIBridge by lazy {
+        PluginWebUIBridge(pluginId)
     }
     
     // ==================== 基础功能 ====================
@@ -1442,5 +1452,110 @@ class PluginBridgeImpl(val pluginId: String) : IPluginBridge {
     
     override fun getDecorationLines(category: String): IntArray {
         return decorationBridge.getDecorationLines(category)
+    }
+
+    // ==================== 构建系统 ====================
+
+    override fun buildProject(projectPath: String): String {
+        return buildBridge.buildProject(projectPath)
+    }
+
+    override fun compileFile(filePath: String): String {
+        return buildBridge.compileFile(filePath)
+    }
+
+    override fun getLastBuildResult(): String? {
+        return buildBridge.getLastBuildResult()
+    }
+
+    override fun cancelBuild() {
+        buildBridge.cancelBuild()
+    }
+
+    // ==================== WebUI ====================
+
+    /**
+     * 打开插件 Web 界面
+     *
+     * 通过 NavigationState 触发 UI 层导航到 PluginWebUIScreen
+     */
+    override fun open(page: String): Boolean {
+        return try {
+            val context = PluginManager.appContext ?: return false
+            // 确保 web 文件存在
+            if (!webUIBridge.webFileExists(page.ifEmpty { "index.html" })) {
+                android.util.Log.w("PluginBridgeImpl", "WebUI 文件不存在: $page")
+                return false
+            }
+            // 触发导航
+            NavigationState.openWebUI(pluginId, page.ifEmpty { "index.html" })
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("PluginBridgeImpl", "打开 WebUI 失败", e)
+            false
+        }
+    }
+
+    /**
+     * 关闭当前 Web 界面
+     */
+    override fun close(): Boolean {
+        return try {
+            NavigationState.closeWebUI()
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("PluginBridgeImpl", "关闭 WebUI 失败", e)
+            false
+        }
+    }
+
+    /**
+     * 检查是否正在显示 Web 界面
+     */
+    override fun isShowing(): Boolean {
+        return NavigationState.isWebUIShowing()
+    }
+
+    /**
+     * 向 WebView 发送消息（宿主 → Web）
+     */
+    override fun sendToWeb(jsonMessage: String) {
+        webUIBridge.sendToWebView(jsonMessage)
+    }
+
+    /**
+     * 向 WebView 执行 JavaScript 代码
+     */
+    override fun evaluateJs(jsCode: String) {
+        val wv = webUIBridge.getWebView()
+        webUIBridge.evaluateJs(wv, jsCode)
+    }
+
+    /**
+     * 检查指定 Web 文件是否存在
+     */
+    override fun webFileExists(filename: String): Boolean {
+        return webUIBridge.webFileExists(filename)
+    }
+
+    /**
+     * 列出 web/ 目录下所有文件
+     */
+    override fun listFiles(): Array<String> {
+        return webUIBridge.listWebFiles()
+    }
+
+    /**
+     * 获取 Web 资源根目录路径
+     */
+    override fun getWebRoot(): String {
+        return webUIBridge.getWebRootDir()?.absolutePath ?: ""
+    }
+
+    /**
+     * 获取 WebView 实例引用
+     */
+    override fun getWebView(): WebView? {
+        return webUIBridge.getWebView()
     }
 }

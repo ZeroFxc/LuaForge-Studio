@@ -111,6 +111,15 @@ class PluginBridge(private val context: Context, private val pluginId: String) {
     
     /** 编辑器装饰 API */
     val decoration = PluginDecoration(pluginId)
+
+    /** 构建系统 API */
+    val build = PluginBuild(context)
+    
+    /** 线程工具 API */
+    val threads = PluginThreads()
+    
+    /** WebUI API */
+    val webui = PluginWebUIBridge(pluginId)
     
     // ============ 版本信息 ============
     

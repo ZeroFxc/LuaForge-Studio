@@ -1,0 +1,22 @@
+{
+  "id": "com.example.project_tools",
+  "name": "项目工具箱",
+  "version": "1.0.0",
+  "description": "项目列表增强：文件统计徽章、滑动操作、自定义菜单项",
+  "author": "DifierLine",
+  "type": "lua",
+  "pluginType": "dependent",
+  "main": "main.lua",
+  "apiVersion": 1,
+  "category": "utility",
+  "homepage": null,
+  "icon": null,
+  "dependencies": [
+    {
+      "pluginId": "com.example.hello_plugin",
+      "minVersion": "1.0.0",
+      "required": true
+    }
+  ],
+  "extendedBy": []
+}

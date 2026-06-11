@@ -1,6 +1,8 @@
 package com.luaforge.studio.lxclua.plugin.bridge
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.luaforge.studio.lxclua.plugin.PluginManager
 import java.io.File
 import java.text.SimpleDateFormat
@@ -51,17 +53,21 @@ class PluginSys(
     }
 
     /**
-     * 显示 Toast 消息
+     * 显示 Toast 消息（自动切换到主线程，安全用于任意线程）
      */
     fun toast(message: String) {
-        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        Handler(Looper.getMainLooper()).post {
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     /**
-     * 显示长 Toast 消息
+     * 显示长 Toast 消息（自动切换到主线程，安全用于任意线程）
      */
     fun toastLong(message: String) {
-        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+        Handler(Looper.getMainLooper()).post {
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+        }
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.luaforge.studio.lxclua.plugin.bridge
 
 import com.luaforge.studio.lxclua.plugin.PluginManager
+import com.luaforge.studio.lxclua.plugin.api.IPluginBridgeProject
 import com.luaforge.studio.lxclua.plugin.data.FileInfo
 import java.io.File
 
@@ -9,19 +10,26 @@ import java.io.File
  * 
  * 使用方式: plugin.project.readFile("path")
  */
-class PluginProject {
+class PluginProject : IPluginBridgeProject {
     
+    /**
+     * 获取当前项目路径（兼容旧名）
+     */
+    fun getPath(): String? {
+        return PluginManager.currentProjectPath.value
+    }
+
     /**
      * 获取当前项目路径
      */
-    fun getPath(): String? {
+    override fun getProjectPath(): String? {
         return PluginManager.currentProjectPath.value
     }
     
     /**
      * 读取项目中的文件
      */
-    fun readFile(relativePath: String): String? {
+    override fun readFile(relativePath: String): String? {
         val projectPath = PluginManager.currentProjectPath.value ?: return null
         val file = File(projectPath, relativePath)
         return if (file.exists() && file.isFile) {
@@ -38,7 +46,7 @@ class PluginProject {
     /**
      * 写入文件（覆盖）
      */
-    fun writeFile(relativePath: String, content: String): Boolean {
+    override fun writeFile(relativePath: String, content: String): Boolean {
         return try {
             val projectPath = PluginManager.currentProjectPath.value ?: return false
             val file = File(projectPath, relativePath)
@@ -53,7 +61,7 @@ class PluginProject {
     /**
      * 创建新文件
      */
-    fun createFile(relativePath: String, content: String): Boolean {
+    override fun createFile(relativePath: String, content: String): Boolean {
         return try {
             val projectPath = PluginManager.currentProjectPath.value ?: return false
             val file = File(projectPath, relativePath)
@@ -69,7 +77,7 @@ class PluginProject {
     /**
      * 删除文件/目录
      */
-    fun deleteFile(relativePath: String): Boolean {
+    override fun deleteFile(relativePath: String): Boolean {
         return try {
             val projectPath = PluginManager.currentProjectPath.value ?: return false
             File(projectPath, relativePath).deleteRecursively()
@@ -81,7 +89,7 @@ class PluginProject {
     /**
      * 检查文件是否存在
      */
-    fun fileExists(relativePath: String): Boolean {
+    override fun fileExists(relativePath: String): Boolean {
         return try {
             val projectPath = PluginManager.currentProjectPath.value ?: return false
             File(projectPath, relativePath).exists()
@@ -94,11 +102,31 @@ class PluginProject {
      * 创建目录
      */
     fun createDir(relativePath: String): Boolean {
+        return createDirectory(relativePath)
+    }
+
+    /**
+     * 创建目录
+     */
+    override fun createDirectory(relativePath: String): Boolean {
         return try {
             val projectPath = PluginManager.currentProjectPath.value ?: return false
             File(projectPath, relativePath).mkdirs()
         } catch (e: Exception) {
             false
+        }
+    }
+
+    /**
+     * 列出项目目录下的文件和子目录
+     */
+    override fun listFiles(relativePath: String): Array<String>? {
+        return try {
+            val projectPath = PluginManager.currentProjectPath.value ?: return null
+            val dir = if (relativePath.isEmpty()) File(projectPath) else File(projectPath, relativePath)
+            dir.list()?.toList()?.toTypedArray()
+        } catch (e: Exception) {
+            null
         }
     }
     

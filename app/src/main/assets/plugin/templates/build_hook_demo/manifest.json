@@ -1,0 +1,17 @@
+{
+  "id": "com.example.build_hook_demo",
+  "name": "构建钩子示例",
+  "version": "1.0.0",
+  "description": "演示 plugin.build 构建系统 API：构建钩子（onBuildStart/onBuildFinish/onBuildError）、主动触发构建/编译",
+  "author": "DifierLine",
+  "type": "lua",
+  "pluginType": "normal",
+  "main": "main.lua",
+  "apiVersion": 1,
+  "category": "demo",
+  "homepage": null,
+  "icon": null,
+  "dependencies": [],
+  "extendedBy": [],
+  "tags": ["build", "hook", "demo"]
+}
